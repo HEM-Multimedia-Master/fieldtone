@@ -23,18 +23,20 @@ API. No account or external service is needed to play.
 | Set output volume | Drag the master slider in the upper-left HUD |
 | Change volume by a dynamic step | Press `↑` or `↓`; each change fades linearly over 500 ms |
 | Shape a note | Adjust `A`, `D`, `S`, and `R` in the upper-left HUD; each stage ranges from 0 to 5 seconds |
+| Toggle dynamic panic | Use the `DP` switch; on by default, it pans each note to the opposite side over attack + release (1 second if both are 0) |
 | Start audio | Play a pad; browsers require a user gesture before audio starts |
 
-Volume has six levels separated by five equal steps:
+Volume has six levels separated by five equal steps. The current level is
+shown using only its dynamic mark, in bold italic serif type:
 
-| Level | Volume | Musical dynamic |
-| --- | ---: | --- |
-| `n` | 0% | niente — silence |
-| `ppp` | 20% | pianississimo — extremely soft |
-| `pp` | 40% | pianissimo — very soft |
-| `p` | 60% | piano — soft |
-| `mf` | 80% | mezzo-forte — moderately loud |
-| `f` | 100% | forte — loud |
+| Musical dynamic | Volume |
+| --- | ---: |
+| `n` | 0% |
+| `ppp` | 20% |
+| `pp` | 40% |
+| `p` | 60% |
+| `mf` | 80% |
+| `f` | 100% |
 
 # Concepts applied
 
@@ -158,6 +160,8 @@ const state = {
   Web Audio context and its per-voice and master signal nodes.
 - `state.analyser` and `state.meterData` let the interface measure the output
   signal and draw the master meter.
+- The `DP` switch controls dynamic panic, which pans each triggered voice from
+  its patch position to the opposite side over the attack and release duration.
 - `attackTime`, `decayTime`, `sustainTime`, and `releaseTime` are the selected
   envelope durations in seconds; their sliders are read when a note is
   triggered.
@@ -209,6 +213,10 @@ envelope.gain.exponentialRampToValueAtTime(0.0001, releaseStart + releaseDuratio
 The tiny minimum stage duration avoids scheduling zero-length automation
 ramps when a slider is set to zero. Increasing any stage lengthens the
 triggered sound by delaying its oscillator stop time.
+
+When dynamic panic is on, each voice's stereo pan ramps from its generated pan
+value to the opposite value over `attack + release` seconds. If both controls
+are zero, the pan transition uses a one-second duration.
 
 The signal graph makes audio routing explicit. Each voice bus can connect to
 the master output, and randomized links also send a quieter part of one voice

@@ -73,11 +73,47 @@
       background: #292d2d;
     }
     .master-meter-fill { display: block; width: 0; height: 100%; background: #858b89; }
-    .volume-dynamic { color: #b2bbb7; white-space: nowrap; }
+    .volume-dynamic {
+      color: #b2bbb7;
+      font: italic 700 13px "Times New Roman", Times, serif;
+      letter-spacing: normal;
+      text-transform: none;
+      white-space: nowrap;
+    }
     .volume-control, .envelope-control { display: flex; align-items: center; }
     .envelope-control { gap: 4px; }
     .envelope-control label, .envelope-control output { color: #858c89; white-space: nowrap; }
     .envelope-control label { min-width: 8px; }
+    .panic-control { display: inline-flex; align-items: center; gap: 4px; color: #858c89; cursor: pointer; white-space: nowrap; }
+    .panic-control input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+    .panic-switch {
+      position: relative;
+      width: 20px;
+      height: 11px;
+      border: 1px solid #626866;
+      border-radius: 6px;
+      background: #252a29;
+      transition: background .15s, border-color .15s;
+    }
+    .panic-switch::after {
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #858c89;
+      content: "";
+      transition: transform .15s, background .15s;
+    }
+    .panic-control input:checked + .panic-switch { border-color: #727876; background: #3a403e; }
+    .panic-control input:checked + .panic-switch::after { transform: translateX(9px); background: #b2bbb7; }
+    .panic-control input:focus-visible + .panic-switch { outline: 1px solid #b2bbb7; outline-offset: 2px; }
     .volume-control input, .envelope-control input {
       width: 72px;
       height: 3px;
@@ -248,7 +284,12 @@
         <label for="master-volume" class="visually-hidden">Master volume</label>
         <input id="master-volume" type="range" min="0" max="100" value="80" aria-label="Master volume">
       </div>
-      <output id="volume-dynamic" class="volume-dynamic" aria-live="polite" title="mf — mezzo-forte">mf · mezzo-forte</output>
+      <output id="volume-dynamic" class="volume-dynamic" aria-live="polite" title="Dynamic: mf (80%)">mf</output>
+      <label class="panic-control" title="Dynamic panic: when on, each note pans from its patch position to the opposite side over attack + release (1 second if both are 0).">
+        <input id="dynamic-panic" type="checkbox" role="switch" aria-label="Dynamic panic" checked>
+        <span class="panic-switch" aria-hidden="true"></span>
+        <span>DP</span>
+      </label>
       <div class="envelope-control">
         <label for="attack-time">A</label>
         <input id="attack-time" type="range" min="0" max="5" step="0.01" value="0.05" aria-label="Attack time in seconds">
@@ -307,6 +348,7 @@
       const historyPosition = document.querySelector("#history-position");
       const masterVolume = document.querySelector("#master-volume");
       const volumeDynamic = document.querySelector("#volume-dynamic");
+      const dynamicPanic = document.querySelector("#dynamic-panic");
       const attackTime = document.querySelector("#attack-time");
       const decayTime = document.querySelector("#decay-time");
       const sustainTime = document.querySelector("#sustain-time");
@@ -327,12 +369,7 @@
         Pluck: "TRIANGLE"
       };
       const volumeDynamics = [
-        { mark: "n", name: "niente" },
-        { mark: "ppp", name: "pianississimo" },
-        { mark: "pp", name: "pianissimo" },
-        { mark: "p", name: "piano" },
-        { mark: "mf", name: "mezzo-forte" },
-        { mark: "f", name: "forte" }
+        "n", "ppp", "pp", "p", "mf", "f"
       ];
       const state = {
         pads: [], links: [], audio: null, buses: [], reverbs: [], master: null,
@@ -344,9 +381,9 @@
       function updateVolumeDisplay(value) {
         const level = Math.max(0, Math.min(100, value));
         const dynamic = volumeDynamics[Math.round(level / 20)];
-        volumeDynamic.value = `${dynamic.mark} · ${dynamic.name}`;
-        volumeDynamic.title = `${dynamic.mark} — ${dynamic.name} (${level}%)`;
-        volumeDynamic.setAttribute("aria-label", `Volume dynamic: ${dynamic.mark}, ${dynamic.name}; ${level}%`);
+        volumeDynamic.value = dynamic;
+        volumeDynamic.title = `Dynamic: ${dynamic} (${level}%)`;
+        volumeDynamic.setAttribute("aria-label", `Volume dynamic: ${dynamic}; ${level}%`);
       }
 
       function currentMasterLevel(now) {
@@ -702,7 +739,13 @@
           }
 
           const panner = context.createStereoPanner();
-          panner.pan.value = pad.pan;
+          if (dynamicPanic.checked) {
+            const panDuration = attack + release || 1;
+            panner.pan.setValueAtTime(pad.pan, now);
+            panner.pan.linearRampToValueAtTime(-pad.pan, now + panDuration);
+          } else {
+            panner.pan.value = pad.pan;
+          }
           const dry = context.createGain();
           dry.gain.value = 0.78;
           const delaySend = context.createGain();

@@ -214,9 +214,11 @@ The tiny minimum stage duration avoids scheduling zero-length automation
 ramps when a slider is set to zero. Increasing any stage lengthens the
 triggered sound by delaying its oscillator stop time.
 
-When dynamic panic is on, each voice's stereo pan ramps from its generated pan
-value to the opposite value over `attack + release` seconds. If both controls
-are zero, the pan transition uses a one-second duration.
+Pan uses the stereo range `-1` (full left) to `+1` (full right). When dynamic
+panic is on, each voice's pan ramps from its generated value to its opposite
+over `attack + release` seconds (for example, `-0.3` to `+0.3`, or `+0.7` to
+`-0.7`). If both controls are zero, the pan transition uses a one-second
+duration.
 
 The signal graph makes audio routing explicit. Each voice bus can connect to
 the master output, and randomized links also send a quieter part of one voice

@@ -438,7 +438,7 @@
           return {
             ...type, index, midi,
             angle: randomBetween(-2.2, 2.2),
-            pan: randomBetween(-0.92, 0.92),
+            pan: randomBetween(-1, 1),
             delay: randomBetween(0.07, 0.42),
             delayMix: randomBetween(0.08, 0.32),
             reverbMix: randomBetween(0.08, 0.55),
@@ -744,10 +744,11 @@
           const panner = context.createStereoPanner();
           if (dynamicPanic.checked) {
             const panDuration = attack + release || 1;
-            panner.pan.setValueAtTime(pad.pan, now);
-            panner.pan.linearRampToValueAtTime(-pad.pan, now + panDuration);
+            const startPan = Math.max(-1, Math.min(1, pad.pan));
+            panner.pan.setValueAtTime(startPan, now);
+            panner.pan.linearRampToValueAtTime(-startPan, now + panDuration);
           } else {
-            panner.pan.value = pad.pan;
+            panner.pan.value = Math.max(-1, Math.min(1, pad.pan));
           }
           const dry = context.createGain();
           dry.gain.value = 0.78;

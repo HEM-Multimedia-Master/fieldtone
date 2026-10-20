@@ -1,854 +1,951 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#08090a">
-  <title>Field / Tone — Generative Instrument</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #08090a;
-      --line: #282c2e;
-      --muted: #747b7d;
-      --text: #e8ecea;
-      --lime: #c8f169;
-      --cyan: #78d9d0;
-      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    body {
-      min-width: 320px;
-      height: 100vh;
-      height: 100dvh;
-      margin: 0;
-      overflow: hidden;
-      background: radial-gradient(ellipse at 50% 44%, rgba(30, 37, 33, .26), transparent 62%), var(--bg);
-      color: var(--text);
-    }
-    button, input { font: inherit; }
-    button { color: inherit; }
-    .app {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-    .hud {
-      position: absolute;
-      z-index: 5;
-      top: 9px;
-      left: 9px;
-      display: flex;
-      flex-wrap: wrap;
-      max-width: calc(100vw - 18px);
-      align-items: center;
-      gap: 9px;
-      color: #969c9a;
-      font: 9px var(--mono);
-      letter-spacing: .06em;
-      text-transform: uppercase;
-    }
-    .hud-brand { color: #dce1df; font-weight: 700; white-space: nowrap; }
-    .hud-version { color: #777e7c; font-weight: 400; }
-    .reroll-button {
-      width: 18px;
-      height: 18px;
-      padding: 0;
-      border: 1px solid #4a514e;
-      border-radius: 2px;
-      background: transparent;
-      color: var(--lime);
-      font: 700 9px var(--mono);
-      line-height: 16px;
-      text-align: center;
-      cursor: pointer;
-    }
-    .reroll-button:hover, .reroll-button:focus-visible { border-color: var(--lime); outline: none; }
-    .master-meter {
-      width: 47px;
-      height: 4px;
-      overflow: hidden;
-      background: #292d2d;
-    }
-    .master-meter-fill { display: block; width: 0; height: 100%; background: #858b89; }
-    .volume-dynamic {
-      display: inline-block;
-      width: 2.2em;
-      color: #b2bbb7;
-      font: italic 700 13px "Times New Roman", Times, serif;
-      letter-spacing: normal;
-      text-transform: none;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .volume-control, .envelope-control { display: flex; align-items: center; }
-    .envelope-control { gap: 4px; }
-    .envelope-control label, .envelope-control output { color: #858c89; white-space: nowrap; }
-    .envelope-control label { min-width: 8px; }
-    .panic-control { display: inline-flex; align-items: center; gap: 4px; color: #858c89; cursor: pointer; white-space: nowrap; }
-    .panic-control input {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-    }
-    .panic-switch {
-      position: relative;
-      width: 20px;
-      height: 11px;
-      border: 1px solid #626866;
-      border-radius: 6px;
-      background: #252a29;
-      transition: background .15s, border-color .15s;
-    }
-    .panic-switch::after {
-      position: absolute;
-      top: 1px;
-      left: 1px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #858c89;
-      content: "";
-      transition: transform .15s, background .15s;
-    }
-    .panic-control input:checked + .panic-switch { border-color: #727876; background: #3a403e; }
-    .panic-control input:checked + .panic-switch::after { transform: translateX(9px); background: #b2bbb7; }
-    .panic-control input:focus-visible + .panic-switch { outline: 1px solid #b2bbb7; outline-offset: 2px; }
-    .volume-control input, .envelope-control input {
-      width: 72px;
-      height: 3px;
-      margin: 0;
-      accent-color: #858b89;
-      cursor: pointer;
-    }
-    .envelope-control input { width: 53px; }
-    .envelope-control output { min-width: 27px; text-align: right; }
-    .patch-history {
-      position: fixed;
-      z-index: 5;
-      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      left: 10px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      color: #929a98;
-      font: 8px var(--mono);
-      letter-spacing: .04em;
-    }
-    .history-button {
-      display: none;
-      width: 25px;
-      height: 25px;
-      place-items: center;
-      padding: 0;
-      border: 1px solid rgba(120, 217, 208, .48);
-      background: rgba(8, 9, 10, .76);
-      color: var(--cyan);
-      cursor: pointer;
-    }
-    .history-button svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; }
-    .history-button:disabled { opacity: .32; cursor: default; }
-    .history-button:not(:disabled):hover, .history-button:not(:disabled):focus-visible { border-color: var(--cyan); outline: none; }
-    .history-position { min-width: 44px; text-align: center; }
-    main.instrument-stage { margin: 0; }
-    .instrument-stage { position: relative; width: 100%; height: 100%; isolation: isolate; }
-    .patch-wires {
-      position: absolute;
-      z-index: 2;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      pointer-events: none;
-    }
-    .wire { fill: none; stroke: rgba(120, 217, 208, .36); stroke-width: 1.25; stroke-dasharray: 3 5; animation: wire-flow 7s linear infinite; }
-    .wire-dot { fill: var(--cyan); filter: drop-shadow(0 0 4px rgba(120,217,208,.72)); }
-    @keyframes wire-flow { to { stroke-dashoffset: -48; } }
-    .pad-grid {
-      position: relative;
-      z-index: 3;
-      display: grid;
-      width: 100%;
-      height: 100%;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      grid-template-rows: repeat(2, minmax(0, 1fr));
-      gap: 0;
-    }
-    .pad {
-      position: relative;
-      z-index: 1;
-      min-width: 0;
-      min-height: 0;
-      overflow: hidden;
-      border: 1px solid #303536;
-      border-radius: 0;
-      padding: 0;
-      background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 46%), rgba(13, 15, 16, .68);
-      text-align: left;
-      cursor: pointer;
-      transform: rotate(var(--pad-angle, 0deg));
-      transition: border-color .16s, background .16s, box-shadow .16s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .pad:hover, .pad:focus-visible, .pad.is-playing {
-      border-color: var(--pad-accent, var(--lime)); background-color: #151918;
-      box-shadow: 0 0 22px color-mix(in srgb, var(--pad-accent, var(--lime)) 10%, transparent); outline: none;
-    }
-    .pad:active { transform: rotate(var(--pad-angle, 0deg)) scale(.985); }
-    .pad.is-playing .waveform { opacity: 1; }
-    .pad-shortcut {
-      position: absolute;
-      z-index: 4;
-      top: 0;
-      right: 0;
-      color: var(--pad-accent, var(--lime));
-      font: 700 10px var(--mono);
-      line-height: 1;
-    }
-    .wave-wrap { position: absolute; inset: 0; margin: 0; padding: 0; pointer-events: none; }
-    .waveform { width: 100%; height: 100%; opacity: .42; color: var(--pad-accent, var(--lime)); transition: opacity .2s; }
-    .wave-line { fill: none; stroke: currentColor; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
-    .wave-dots { fill: currentColor; }
-    .pad-readout {
-      position: absolute;
-      z-index: 4;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      display: flex;
-      align-items: baseline;
-      justify-content: center;
-      gap: clamp(3px, .55vw, 10px);
-      overflow: hidden;
-      color: #c0c7c4;
-      font: 8px var(--mono);
-      letter-spacing: -.025em;
-      line-height: 1.2;
-      white-space: nowrap;
-      text-transform: uppercase;
-      background: rgba(8, 9, 10, .78);
-    }
-    .pad-readout strong { color: #f0f2f1; font-weight: 700; }
-    .pad-readout i { color: #b3bbb8; font-style: italic; }
-    .pad-readout em { color: var(--pad-accent, var(--lime)); font-style: normal; font-weight: 700; }
-    .visually-hidden {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      clip-path: inset(50%);
-    }
-    #notice {
-      position: fixed; z-index: 5; right: 20px; bottom: 20px; max-width: min(360px, calc(100vw - 40px));
-      border: 1px solid #454c4b; border-left: 2px solid var(--lime); border-radius: 3px; padding: 11px 14px;
-      background: #111514; color: var(--text); font: 11px var(--mono); opacity: 0; pointer-events: none;
-      transform: translateY(8px); transition: opacity .18s, transform .18s;
-    }
-    #notice.visible { opacity: 1; transform: translateY(0); }
-    @media (min-width: 1200px) and (min-height: 860px) {
-      .pad-readout { font-size: 9px; }
-    }
-    @media (max-width: 650px) {
-      .pad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
-      .pad-readout { gap: 4px; font-size: 7px; letter-spacing: -.06em; }
-      .hud { top: 7px; left: 7px; gap: 7px; font-size: 8px; }
-      .master-meter { width: 35px; }
-      .volume-control input { width: 56px; }
-      .envelope-control input { width: 42px; }
-      .history-button { display: grid; }
-    }
-    @media (max-width: 380px) {
-      .pad-readout { gap: 3px; font-size: 6px; }
-      .hud { gap: 5px; }
-      .master-meter { width: 28px; }
-      .volume-control input { width: 48px; }
-      .envelope-control input { width: 34px; }
-      .envelope-control output { min-width: 24px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#08090a">
+<meta name="description" content="Six generative synthesizer pads with a draggable ADSR envelope and full-window touch filters.">
+<title>FIELDTONE</title>
+<style>
+  #fieldtone-container {
+    --bg: #08090a;
+    --line: #343a39;
+    --text: #b6bfba;
+    --lime: #c8f169;
+    --cyan: #78d9d0;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font: 10px var(--mono);
+    color-scheme: dark;
+  }
+  #fieldtone-container *, #fieldtone-container *::before, #fieldtone-container *::after { box-sizing: border-box; }
+  #fieldtone-container button { color: inherit; font: inherit; border-radius: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #fieldtone-container button:focus-visible { outline: 1px solid var(--lime); outline-offset: -3px; }
+  #fieldtone-container .app { display: grid; grid-template-rows: minmax(0, 1fr) 15%; width: 100%; height: 100%; margin: 0; padding: 0; }
+  #fieldtone-container .instrument-stage { position: relative; width: 100%; max-width: none; min-width: 0; height: 100%; min-height: 0; background: transparent; border: 0; margin: 0; padding: 0; isolation: isolate; }
+  #fieldtone-container .patch-wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+  #fieldtone-container .wire { fill: none; stroke: var(--cyan); stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 5; }
+  #fieldtone-container .wire-dot { fill: var(--cyan); }
+  #fieldtone-container .pad-grid { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); width: 100%; height: 100%; gap: 0; z-index: 3; }
+  #fieldtone-container .pad { position: relative; overflow: hidden; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; touch-action: none; user-select: none; }
+  #fieldtone-container .pad:nth-child(3n) { border-right: 0; }
+  #fieldtone-container .pad:nth-last-child(-n+3) { border-bottom: 0; }
+  #fieldtone-container .pad.is-playing .waveform, #fieldtone-container .pad:hover .waveform { opacity: 1; }
+  #fieldtone-container .pad-shortcut { position: absolute; top: 3px; right: 3px; z-index: 4; color: var(--pad-accent); font-size: 9px; }
+  #fieldtone-container .wave-wrap { position: absolute; inset: 0; pointer-events: none; }
+  #fieldtone-container .waveform { width: 100%; height: 100%; color: var(--pad-accent); opacity: .55; transition: opacity .12s; }
+  #fieldtone-container .wave-line { fill: none; stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  #fieldtone-container .wave-dots { fill: currentColor; }
+  #fieldtone-container .pad-readout { position: absolute; z-index: 4; inset: auto 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; font: 8px/1.2 var(--mono); pointer-events: none; }
+  #fieldtone-container .pad-readout strong { font-weight: 400; }
+  #fieldtone-container .pad-readout i { font-style: normal; }
+  #fieldtone-container .pad-readout em { color: var(--pad-accent); font-style: normal; }
+  #fieldtone-container .filter-readout { color: var(--cyan); }
+  #fieldtone-container .bottom-panel { display: grid; grid-template-columns: clamp(86px, 18vw, 180px) minmax(0, 1fr); min-height: 0; border-top: 1px solid var(--line); }
+  #fieldtone-container .set-controls { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: minmax(0, 1fr) 20px; min-height: 0; border-right: 1px solid var(--line); }
+  #fieldtone-container .set-controls button { min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--line); font-size: clamp(13px, 2vw, 22px); touch-action: manipulation; }
+  #fieldtone-container #reroll-button { border: 1px solid var(--lime); color: var(--lime); }
+  #fieldtone-container .set-controls button:disabled { opacity: .25; cursor: default; }
+  #fieldtone-container #history-position { grid-column: 1 / -1; display: grid; place-items: center; font-size: clamp(8px, 1vw, 10px); letter-spacing: .08em; }
+  #fieldtone-container #envelope-editor { min-width: 0; min-height: 0; position: relative; margin: 0; padding: 0; }
+  #fieldtone-container #envelope-plot { position: absolute; inset: 0; touch-action: none; user-select: none; }
+  #fieldtone-container #envelope-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+  #fieldtone-container #envelope-path { fill: none; stroke: var(--lime); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  #fieldtone-container .envelope-grid { fill: none; stroke: var(--line); stroke-width: .5; vector-effect: non-scaling-stroke; }
+  #fieldtone-container .envelope-point { position: absolute; display: grid; place-items: center; width: 36px; height: 36px; margin: 0; padding: 0; border: 0; transform: translate(-50%, -50%); cursor: ew-resize; touch-action: none; }
+  #fieldtone-container .envelope-point[data-stage="attack"], #fieldtone-container .envelope-point[data-stage="release"] { cursor: move; }
+  #fieldtone-container .point-mark { width: 7px; height: 7px; border: 1px solid var(--lime); background: var(--bg); }
+  #fieldtone-container .point-label { display: grid; gap: 2px; text-align: center; position: absolute; top: 25px; white-space: nowrap; font-size: clamp(7px, .8vw, 10px); line-height: 1; color: var(--text); }
+  #fieldtone-container .envelope-point[data-stage="release"] .point-label { top: -16px; }
+  #fieldtone-container #filter-crosshair { position: fixed; width: 28px; height: 28px; border: 1px solid var(--cyan); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
+  #fieldtone-container #filter-crosshair::before, #fieldtone-container #filter-crosshair::after { content: ''; position: absolute; background: var(--cyan); }
+  #fieldtone-container #filter-crosshair::before { width: 44px; height: 1px; left: -9px; top: 13px; }
+  #fieldtone-container #filter-crosshair::after { height: 44px; width: 1px; top: -9px; left: 13px; }
+  #fieldtone-container #filter-crosshair span { position: absolute; left: 22px; top: 20px; white-space: nowrap; color: var(--cyan); font: 9px var(--mono); }
+  #fieldtone-container #filter-crosshair.at-right span { left: auto; right: 22px; }
+  #fieldtone-container #filter-crosshair.at-bottom span { top: auto; bottom: 20px; }
+  #fieldtone-container #notice { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); max-width: 90%; margin: 0; color: var(--lime); background: var(--bg); font: 10px var(--mono); opacity: 0; pointer-events: none; z-index: 12; }
+  #fieldtone-container #notice.visible { opacity: 1; }
+  #fieldtone-container .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* Keep help above the set navigation. */
+  #fieldtone-container ~ #info-corner { bottom: 15dvh; }
+  @media (max-width: 650px) {
+    #fieldtone-container .pad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+    #fieldtone-container .pad:nth-child(n) { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    #fieldtone-container .pad:nth-child(2n) { border-right: 0; }
+    #fieldtone-container .pad:nth-last-child(-n+2) { border-bottom: 0; }
+    #fieldtone-container .pad-readout { font-size: 7px; }
+  }
+  @media (max-height: 450px) {
+    #fieldtone-container .set-controls { grid-template-rows: minmax(0, 1fr) 14px; }
+    #fieldtone-container .point-label { font-size: 7px; }
+    #fieldtone-container .stage-time, #fieldtone-container .curve-name { display: none; }
+    #fieldtone-container .envelope-point[data-stage="release"] .point-label { top: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { #fieldtone-container * { transition: none !important; } }
+
+html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscroll-behavior: none; }
+#info-corner { position: fixed; left: 0; bottom: 15dvh; width: 44px; height: 44px; border: 0; background: transparent; color: #b6bfba; font: 24px monospace; cursor: pointer; z-index: 15; }
+#hero-modal { box-sizing: border-box; max-width: min(640px, 94vw); max-height: 90dvh; padding: 24px; border: 1px solid #343a39; background: #08090a; color: #b6bfba; font: 14px/1.6 monospace; }
+#hero-modal::backdrop { background: #000c; }
+#hero-modal h1, #hero-modal h2, #hero-modal a { color: #c8f169; }
+#hero-modal h1 { font-size: 22px; } #hero-modal h2 { font-size: 16px; }
+#hero-modal-close { float: right; width: 44px; height: 44px; border: 1px solid #343a39; background: transparent; color: inherit; font-size: 24px; cursor: pointer; }
+:focus-visible { outline: 1px solid #c8f169; outline-offset: -3px; }
+</style>
 </head>
 <body>
+<div id="fieldtone-container">
   <div class="app">
-    <header class="hud" aria-label="Master controls">
-      <span class="hud-brand">FIELDTONE <span class="hud-version">0.1</span></span>
-      <button id="reroll-button" class="reroll-button" type="button" aria-label="Randomize sounds" aria-keyshortcuts="R" title="Randomize sounds (R)">R</button>
-      <span id="master-meter" class="master-meter" role="meter" aria-label="Master output level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <span id="master-meter-fill" class="master-meter-fill"></span>
-      </span>
-      <div class="volume-control">
-        <label for="master-volume" class="visually-hidden">Master volume</label>
-        <input id="master-volume" type="range" min="0" max="100" value="80" aria-label="Master volume">
-      </div>
-      <output id="volume-dynamic" class="volume-dynamic" aria-live="polite" title="Dynamic: mf (80%)">mf</output>
-      <label class="panic-control" title="Dynamic panic: when on, each note pans from its patch position to the opposite side over attack + release (1 second if both are 0).">
-        <input id="dynamic-panic" type="checkbox" role="switch" aria-label="Dynamic panic" checked>
-        <span class="panic-switch" aria-hidden="true"></span>
-        <span>DP</span>
-      </label>
-      <div class="envelope-control">
-        <label for="attack-time">A</label>
-        <input id="attack-time" type="range" min="0" max="5" step="0.01" value="0.05" aria-label="Attack time in seconds">
-        <output id="attack-value" for="attack-time">0.05s</output>
-      </div>
-      <div class="envelope-control">
-        <label for="decay-time">D</label>
-        <input id="decay-time" type="range" min="0" max="5" step="0.01" value="0.20" aria-label="Decay time in seconds">
-        <output id="decay-value" for="decay-time">0.20s</output>
-      </div>
-      <div class="envelope-control">
-        <label for="sustain-time">S</label>
-        <input id="sustain-time" type="range" min="0" max="5" step="0.01" value="0.40" aria-label="Sustain time in seconds">
-        <output id="sustain-value" for="sustain-time">0.40s</output>
-      </div>
-      <div class="envelope-control">
-        <label for="release-time">R</label>
-        <input id="release-time" type="range" min="0" max="5" step="0.01" value="0.30" aria-label="Release time in seconds">
-        <output id="release-value" for="release-time">0.30s</output>
-      </div>
-    </header>
-    <main class="instrument-stage" aria-label="Six synthesizer pads; click or press keys 1 through 6 to play">
+    <main class="instrument-stage" aria-label="Six synthesizer pads. Hold and drag: vertical frequency, horizontal Q.">
       <svg id="patch-wires" class="patch-wires" aria-hidden="true"></svg>
       <div id="pad-grid" class="pad-grid"></div>
     </main>
-    <nav class="patch-history" aria-label="Patch history">
-      <button id="history-back" class="history-button" type="button" aria-label="Previous patch" title="Previous patch (Left arrow or Space)">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5 5 8l5.5 5.5"></path></svg>
-      </button>
-      <output id="history-position" class="history-position" aria-live="polite">PATCH 1 / 1</output>
-      <button id="history-forward" class="history-button" type="button" aria-label="Next patch" title="Next patch (Right arrow or Shift+Space)">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2.5 11 8l-5.5 5.5"></path></svg>
-      </button>
-    </nav>
+    <div class="bottom-panel">
+      <nav class="set-controls" aria-label="Sound sets">
+        <button id="reroll-button" type="button" aria-label="Generate sound set" title="Generate sound set (R)">R</button>
+        <button id="history-back" type="button" aria-label="Previous sound set" title="Previous set (Left / Space)">&lt;</button>
+        <button id="history-forward" type="button" aria-label="Next sound set" title="Next set (Right / Shift+Space)">&gt;</button>
+        <output id="history-position" aria-live="polite">SET 1 / 1</output>
+      </nav>
+      <section id="envelope-editor" aria-label="ADSR envelope">
+        <div id="envelope-plot">
+          <svg id="envelope-svg" aria-hidden="true">
+            <path class="envelope-grid" id="envelope-grid"></path>
+            <path id="envelope-path"></path>
+          </svg>
+          <button class="envelope-point" data-stage="attack" type="button" role="slider"
+            aria-label="attack time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
+            title="ATTACK: drag horizontally for time; vertically for curve">
+            <span class="point-mark" aria-hidden="true"></span>
+            <span class="point-label" aria-hidden="true">A</span>
+          </button>
+          <button class="envelope-point" data-stage="decay" type="button" role="slider"
+            aria-label="decay time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
+            title="DECAY: drag horizontally for time">
+            <span class="point-mark" aria-hidden="true"></span>
+            <span class="point-label" aria-hidden="true">D</span>
+          </button>
+          <button class="envelope-point" data-stage="sustain" type="button" role="slider"
+            aria-label="sustain time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
+            title="SUSTAIN: drag horizontally for time">
+            <span class="point-mark" aria-hidden="true"></span>
+            <span class="point-label" aria-hidden="true">S</span>
+          </button>
+          <button class="envelope-point" data-stage="release" type="button" role="slider"
+            aria-label="release time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
+            title="RELEASE: drag horizontally for time; vertically for curve">
+            <span class="point-mark" aria-hidden="true"></span>
+            <span class="point-label" aria-hidden="true">R</span>
+          </button>
+        </div>
+        <output id="envelope-description" class="visually-hidden" aria-live="polite"></output>
+      </section>
+    </div>
   </div>
+  <div id="filter-crosshair" aria-hidden="true" hidden><span></span></div>
   <div id="notice" role="status" aria-live="polite"></div>
-  <script>
-    (() => {
-      "use strict";
+</div>
+<button id="info-corner" type="button" aria-label="How to play (I)" aria-haspopup="dialog" title="How to play (I)">⌞</button>
+<dialog id="hero-modal" aria-labelledby="help-title">
+  <button id="hero-modal-close" type="button" aria-label="Close help">×</button>
+  <h1 id="help-title">FIELDTONE</h1>
+  <p>Hold a pad or keys <b>1–6</b> to play. Release to fade out. Multiple fingers play independent voices.</p>
+  <h2>Sound sets</h2><p><b>R</b> generates a set. <b>← / Space</b> goes back; <b>→ / Shift+Space</b> goes forward. History lasts until reload; generating from an older set replaces its future.</p>
+  <h2>Envelope</h2><p>Drag <b>A, D, S, R</b> horizontally to move time boundaries (0.005–5 seconds per stage). Neighbouring durations change together. S is a minimum sustain duration at 60% of peak; holding extends it.</p>
+  <p>Drag <b>A or R vertically</b>: up = logarithmic, middle = linear, down = power. Tab to a point: ← / → adjusts time (Shift for larger steps); ↑ / ↓ on A or R changes its curve.</p>
+  <h2>Filter gesture</h2><p>Hold a pad and drag across the full window. <b>Vertical</b>: cutoff frequency, 40 Hz at the bottom to 16 kHz at the top. <b>Horizontal</b>: Q, 0.2 at the left to 18 at the right. Each pad keeps its settings in its sound set.</p>
+  <p><b>↑ / ↓</b> changes volume in 20% steps with a 500 ms fade (default 80%). Envelope points use their own arrow controls when focused.</p>
+  <p><b>I</b> opens this help; <b>Esc</b> closes it. Opening help or leaving the page releases held sounds.</p>
+  <p><a href="https://github.com/HEM-Multimedia-Master/fieldtone">Source and README</a></p>
+</dialog>
+<script type="module">
+// Shared envelope mathematics: both the SVG editor and Web Audio use these curves.
+const STAGES = ['attack', 'decay', 'sustain', 'release'];
+const CURVES = ['logarithmic', 'linear', 'power'];
+const MIN_TIME = 0.005;
+const MAX_TIME = 5;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-      const synthTypes = [
-        { name: "Additive", short: "ADDITIVE", accent: "#c8f169" },
-        { name: "Subtractive", short: "SUBTRACTIVE", accent: "#78d9d0" },
-        { name: "FM", short: "FREQUENCY MOD", accent: "#dfa0f4" },
-        { name: "Ring Mod", short: "RING MODULATOR", accent: "#ffad77" },
-        { name: "Supersaw", short: "DETUNED SAW", accent: "#f0788e" },
-        { name: "Pluck", short: "RESONANT PLUCK", accent: "#83aaff" }
-      ];
-      const padGrid = document.querySelector("#pad-grid");
-      const stage = document.querySelector(".instrument-stage");
-      const wires = document.querySelector("#patch-wires");
-      const notice = document.querySelector("#notice");
-      const rerollButton = document.querySelector("#reroll-button");
-      const historyBack = document.querySelector("#history-back");
-      const historyForward = document.querySelector("#history-forward");
-      const historyPosition = document.querySelector("#history-position");
-      const masterVolume = document.querySelector("#master-volume");
-      const volumeDynamic = document.querySelector("#volume-dynamic");
-      const dynamicPanic = document.querySelector("#dynamic-panic");
-      const attackTime = document.querySelector("#attack-time");
-      const decayTime = document.querySelector("#decay-time");
-      const sustainTime = document.querySelector("#sustain-time");
-      const releaseTime = document.querySelector("#release-time");
-      const attackValue = document.querySelector("#attack-value");
-      const decayValue = document.querySelector("#decay-value");
-      const sustainValue = document.querySelector("#sustain-value");
-      const releaseValue = document.querySelector("#release-value");
-      const masterMeter = document.querySelector("#master-meter");
-      const masterMeterFill = document.querySelector("#master-meter-fill");
-      const noteNames = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
-      const oscillatorLabels = {
-        Additive: "SINE",
-        Subtractive: "SAW",
-        FM: "SINE",
-        "Ring Mod": "SAW",
-        Supersaw: "SAW",
-        Pluck: "TRIANGLE"
+function curveValue(shape, position) {
+  const t = clamp(position, 0, 1);
+  if (shape === 'logarithmic') return Math.log1p(9 * t) / Math.log(10);
+  if (shape === 'power') return t * t;
+  return t;
+}
+
+function curveSamples(from, to, shape, count = 96) {
+  return Float32Array.from({ length: count }, (_, index) =>
+    from + (to - from) * curveValue(shape, index / (count - 1)));
+}
+
+function envelopeBoundaries(envelope) {
+  let time = 0;
+  return [0, ...STAGES.map((stage) => (time += envelope[stage]))];
+}
+
+// Move one boundary without crossing its neighbours or changing later boundaries.
+function moveEnvelopePoint(envelope, stage, time) {
+  const index = STAGES.indexOf(stage);
+  if (index < 0 || !Number.isFinite(time)) return { ...envelope };
+  const bounds = envelopeBoundaries(envelope);
+  const previous = bounds[index];
+  const next = bounds[index + 2];
+  const min = Math.max(previous + MIN_TIME, next === undefined ? 0 : next - MAX_TIME);
+  const max = Math.min(previous + MAX_TIME, next === undefined ? Infinity : next - MIN_TIME);
+  const boundary = clamp(time, min, max);
+  const result = { ...envelope, [stage]: boundary - previous };
+  if (next !== undefined) result[STAGES[index + 1]] = next - boundary;
+  return result;
+}
+
+function filterFromPosition(x, y, width, height) {
+  const horizontal = clamp(x / Math.max(1, width), 0, 1);
+  const vertical = 1 - clamp(y / Math.max(1, height), 0, 1);
+  return { cutoff: 40 * (400 ** vertical), resonance: 0.2 + horizontal * 17.8 };
+}
+
+
+// Pointer and keyboard ADSR editor.
+function setupEnvelopeEditor(root, envelope, signal) {
+  const plot = root.querySelector('#envelope-plot');
+  const svg = root.querySelector('#envelope-svg');
+  const path = root.querySelector('#envelope-path');
+  const grid = root.querySelector('#envelope-grid');
+  const description = root.querySelector('#envelope-description');
+  const points = [...plot.querySelectorAll('.envelope-point')];
+  let drag = null;
+
+  function geometry() {
+    const rect = plot.getBoundingClientRect();
+    const bounds = envelopeBoundaries(envelope);
+    const horizon = drag?.horizon ?? Math.max(0.1, bounds[4] * 1.2);
+    return { rect, bounds, horizon, width: Math.max(1, rect.width - 36), top: 12, bottom: Math.max(18, rect.height - 18) };
+  }
+
+  function render() {
+    const { rect, bounds, horizon, width, top, bottom } = geometry();
+    if (!rect.width || !rect.height) return;
+    const x = (time) => 18 + time / horizon * width;
+    const y = (level) => bottom - level * (bottom - top);
+    svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+    const levels = [0, 1, 0.6, 0.6, 0];
+    let d = `M ${x(0)} ${y(0)}`;
+    for (let stage = 0; stage < 4; stage++) {
+      const curve = stage === 0 ? envelope.attackCurve : stage === 3 ? envelope.releaseCurve : 'linear';
+      for (let step = 1; step <= 48; step++) {
+        const t = step / 48;
+        const time = bounds[stage] + (bounds[stage + 1] - bounds[stage]) * t;
+        const level = levels[stage] + (levels[stage + 1] - levels[stage]) * curveValue(curve, t);
+        d += ` L ${x(time)} ${y(level)}`;
+      }
+    }
+    path.setAttribute('d', d);
+    grid.setAttribute('d', `M 18 ${y(0)} H ${rect.width - 18} M 18 ${y(0.6)} H ${rect.width - 18} M 18 ${y(1)} H ${rect.width - 18}`);
+    points.forEach((point, index) => {
+      const stage = STAGES[index];
+      const curve = stage === 'attack' ? envelope.attackCurve : stage === 'release' ? envelope.releaseCurve : '';
+      point.style.left = `${x(bounds[index + 1])}px`;
+      point.style.top = `${y(levels[index + 1])}px`;
+      point.setAttribute('aria-valuenow', envelope[stage].toFixed(3));
+      point.setAttribute('aria-valuetext', `${envelope[stage].toFixed(2)} seconds${curve ? `, ${curve} curve` : ''}`);
+      point.dataset.curve = curve;
+      point.querySelector('.point-label').innerHTML = `<b>${stage[0].toUpperCase()}</b><span class="stage-time">${envelope[stage].toFixed(2)}s</span>${curve ? `<span class="curve-name">${curve === 'logarithmic' ? 'LOG' : curve === 'power' ? 'POW' : 'LIN'}</span>` : ''}`;
+    });
+  }
+
+  function describe() {
+    description.value = STAGES.map((stage) => `${stage}: ${envelope[stage].toFixed(2)} seconds`).join(', ') + `. Attack ${envelope.attackCurve}; release ${envelope.releaseCurve}.`;
+  }
+
+  points.forEach((point) => {
+    const stage = point.dataset.stage;
+    point.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      point.focus({ preventScroll: true });
+      const { rect, bounds, horizon, width } = geometry();
+      drag = { pointerId: event.pointerId, stage, snapshot: { ...envelope }, x: event.clientX, y: event.clientY, rect, horizon, width, boundary: bounds[STAGES.indexOf(stage) + 1] };
+      point.setPointerCapture(event.pointerId);
+    }, { signal });
+    point.addEventListener('pointermove', (event) => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const time = drag.boundary + (event.clientX - drag.x) / drag.width * drag.horizon;
+      Object.assign(envelope, moveEnvelopePoint(drag.snapshot, stage, time));
+      if (stage === 'attack' || stage === 'release') {
+        const key = `${stage}Curve`;
+        const offset = Math.round((event.clientY - drag.y) / Math.max(14, drag.rect.height * 0.25));
+        const index = clamp(CURVES.indexOf(drag.snapshot[key]) + offset, 0, CURVES.length - 1);
+        envelope[key] = CURVES[index];
+      }
+      render();
+    }, { signal });
+    const finish = (event) => {
+      if (drag?.pointerId !== event.pointerId) return;
+      drag = null;
+      if (point.hasPointerCapture(event.pointerId)) point.releasePointerCapture(event.pointerId);
+      render();
+      describe();
+    };
+    point.addEventListener('pointerup', finish, { signal });
+    point.addEventListener('pointercancel', finish, { signal });
+    point.addEventListener('lostpointercapture', finish, { signal });
+    point.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        const boundary = envelopeBoundaries(envelope)[STAGES.indexOf(stage) + 1];
+        const step = event.shiftKey ? 0.1 : 0.01;
+        Object.assign(envelope, moveEnvelopePoint(envelope, stage, boundary + (event.key === 'ArrowRight' ? step : -step)));
+      } else if (stage === 'attack' || stage === 'release') {
+        const key = `${stage}Curve`;
+        const index = clamp(CURVES.indexOf(envelope[key]) + (event.key === 'ArrowDown' ? 1 : -1), 0, CURVES.length - 1);
+        envelope[key] = CURVES[index];
+      }
+      render();
+      describe();
+    }, { signal });
+  });
+  const observer = new ResizeObserver(render);
+  observer.observe(plot);
+  signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+  render();
+  describe();
+}
+
+
+// Sound-set state, pad gestures, synthesis, and lifecycle.
+function initFieldtone() {
+  "use strict";
+  const root = document.getElementById('fieldtone-container');
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = 'true';
+  const controller = new AbortController();
+  const { signal } = controller;
+
+  const synthTypes = [
+    { name: "Additive", short: "ADDITIVE", accent: "#c8f169" },
+    { name: "Subtractive", short: "SUBTRACTIVE", accent: "#78d9d0" },
+    { name: "FM", short: "FREQUENCY MOD", accent: "#dfa0f4" },
+    { name: "Ring Mod", short: "RING MODULATOR", accent: "#ffad77" },
+    { name: "Supersaw", short: "DETUNED SAW", accent: "#f0788e" },
+    { name: "Pluck", short: "RESONANT PLUCK", accent: "#83aaff" }
+  ];
+  const padGrid = root.querySelector("#pad-grid");
+  const stage = root.querySelector(".instrument-stage");
+  const wires = root.querySelector("#patch-wires");
+  const notice = root.querySelector("#notice");
+  const rerollButton = root.querySelector("#reroll-button");
+  const historyBack = root.querySelector("#history-back");
+  const historyForward = root.querySelector("#history-forward");
+  const historyPosition = root.querySelector("#history-position");
+  const noteNames = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+  const oscillatorLabels = {
+    Additive: "SINE",
+    Subtractive: "SAW",
+    FM: "SINE",
+    "Ring Mod": "SAW",
+    Supersaw: "SAW",
+    Pluck: "TRIANGLE"
+  };
+  const state = {
+    pads: [], links: [], audio: null, buses: [], reverbs: [], master: null,
+    noticeTimer: 0,
+    history: [], historyIndex: -1, masterLevel: 80,
+    volumeRamp: { startValue: 80, targetValue: 80, startTime: 0, duration: 0 }
+  };
+
+  function currentMasterLevel(now) {
+    const { startValue, targetValue, startTime, duration } = state.volumeRamp;
+    if (!duration || now >= startTime + duration) return targetValue;
+    const progress = Math.max(0, (now - startTime) / duration);
+    return startValue + (targetValue - startValue) * progress;
+  }
+
+  function setMasterVolume(value, smooth = false) {
+    const target = Math.max(0, Math.min(100, value));
+    const now = state.audio?.currentTime ?? 0;
+    const start = state.audio ? currentMasterLevel(now) : target;
+    state.masterLevel = target;
+    announce(`VOLUME ${Math.round(target)}%`);
+
+    if (state.master && state.audio) {
+      state.master.gain.cancelScheduledValues(now);
+      state.master.gain.setValueAtTime(start / 100, now);
+      const duration = smooth ? 0.5 : 0;
+      if (duration) state.master.gain.linearRampToValueAtTime(target / 100, now + duration);
+      else state.master.gain.setValueAtTime(target / 100, now);
+      state.volumeRamp = { startValue: start, targetValue: target, startTime: now, duration };
+    } else {
+      state.volumeRamp = { startValue: target, targetValue: target, startTime: now, duration: 0 };
+    }
+  }
+
+  const envelopeSettings = { attack: 0.05, decay: 0.2, sustain: 0.4, release: 0.3, attackCurve: 'linear', releaseCurve: 'linear' };
+  const gates = new Map();
+  const activeVoices = new Set();
+  const crosshair = root.querySelector('#filter-crosshair');
+  const timers = new Set();
+  function later(callback, milliseconds) {
+    const id = window.setTimeout(() => { timers.delete(id); callback(); }, milliseconds);
+    timers.add(id);
+    return id;
+  }
+  setupEnvelopeEditor(root, envelopeSettings, signal);
+
+  function beginGate(index, key, origin = null) {
+    if (gates.has(key)) return;
+    const gate = { index, pad: state.pads[index], released: false, cancelled: false, voice: null, origin, dragged: false };
+    gates.set(key, gate);
+    void play(index, gate);
+    return gate;
+  }
+  function endGate(key, immediate = false) {
+    const gate = gates.get(key);
+    if (!gate) return;
+    gate.released = true;
+    if (immediate) gate.cancelled = true;
+    gate.voice?.release(immediate);
+    gates.delete(key);
+    if (![...gates.values()].some((item) => item.dragged)) crosshair.hidden = true;
+  }
+  function releaseAll() {
+    for (const gate of gates.values()) { gate.cancelled = true; gate.released = true; }
+    gates.clear();
+    for (const voice of activeVoices) voice.release(true);
+    crosshair.hidden = true;
+  }
+  function bindPadGesture(button, index) {
+    button.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      button.focus({ preventScroll: true });
+      const gate = beginGate(index, `pointer:${event.pointerId}`, { x: event.clientX, y: event.clientY });
+      if (gate) button.setPointerCapture(event.pointerId);
+    }, { signal });
+    button.addEventListener('pointermove', (event) => {
+      const gate = gates.get(`pointer:${event.pointerId}`);
+      if (!gate) return;
+      if (!gate.dragged && Math.hypot(event.clientX - gate.origin.x, event.clientY - gate.origin.y) < 3) return;
+      gate.dragged = true;
+      const filter = filterFromPosition(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
+      Object.assign(gate.pad, filter);
+      for (const voice of activeVoices) {
+        if (voice.pad !== gate.pad) continue;
+        const now = state.audio.currentTime;
+        voice.filter.frequency.setTargetAtTime(Math.min(filter.cutoff, state.audio.sampleRate * 0.45), now, 0.015);
+        voice.filter.Q.setTargetAtTime(filter.resonance, now, 0.015);
+      }
+      button.querySelector('.filter-readout').textContent = `F ${Math.round(filter.cutoff)}Hz · Q ${filter.resonance.toFixed(1)}`;
+      crosshair.hidden = false;
+      crosshair.classList.toggle('at-right', event.clientX > innerWidth - 160);
+      crosshair.classList.toggle('at-bottom', event.clientY > innerHeight - 50);
+      crosshair.style.left = `${clamp(event.clientX, 0, innerWidth)}px`;
+      crosshair.style.top = `${clamp(event.clientY, 0, innerHeight)}px`;
+      crosshair.querySelector('span').textContent = `F ${Math.round(filter.cutoff)}Hz / Q ${filter.resonance.toFixed(1)}`;
+    }, { signal });
+    const finish = (event) => {
+      endGate(`pointer:${event.pointerId}`, event.type !== 'pointerup');
+      if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+    };
+    button.addEventListener('pointerup', finish, { signal });
+    button.addEventListener('pointercancel', finish, { signal });
+    button.addEventListener('lostpointercapture', finish, { signal });
+    // Screen-reader activation and Enter retain native button behaviour.
+    button.addEventListener('click', (event) => {
+      if (event.detail !== 0) return;
+      const key = Symbol('activation');
+      beginGate(index, key);
+      endGate(key);
+    }, { signal });
+  }
+
+
+  function randomBetween(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function shuffled(items) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  function makePatch() {
+    const types = shuffled(synthTypes);
+    const pads = types.map((type, index) => {
+      const midi = Math.floor(randomBetween(48, 73));
+      return {
+        ...type, index, midi,
+        angle: 0,
+        pan: randomBetween(-1, 1),
+        delay: randomBetween(0.07, 0.42),
+        delayMix: randomBetween(0.08, 0.32),
+        reverbMix: randomBetween(0.08, 0.55),
+        cutoff: randomBetween(550, 5400),
+        resonance: randomBetween(1, 9),
+        detune: randomBetween(4, 28),
+        modulation: randomBetween(1.4, 4.8)
       };
-      const volumeDynamics = [
-        "n", "ppp", "pp", "p", "mf", "f"
-      ];
-      const state = {
-        pads: [], links: [], audio: null, buses: [], reverbs: [], master: null,
-        analyser: null, meterData: null, meterFrame: 0, noticeTimer: 0,
-        history: [], historyIndex: -1, masterLevel: 80,
-        volumeRamp: { startValue: 80, targetValue: 80, startTime: 0, duration: 0 }
-      };
-
-      function updateVolumeDisplay(value) {
-        const level = Math.max(0, Math.min(100, value));
-        const dynamic = volumeDynamics[Math.round(level / 20)];
-        volumeDynamic.value = dynamic;
-        volumeDynamic.title = `Dynamic: ${dynamic} (${level}%)`;
-        volumeDynamic.setAttribute("aria-label", `Volume dynamic: ${dynamic}; ${level}%`);
+    });
+    const order = shuffled(pads.map((pad) => pad.index));
+    const possibleLinks = [];
+    for (let from = 0; from < order.length; from += 1) {
+      for (let to = from + 1; to < order.length; to += 1) {
+        if (Math.random() < 0.38) possibleLinks.push([order[from], order[to]]);
       }
+    }
+    const links = shuffled(possibleLinks).slice(0, Math.floor(randomBetween(4, 8)));
+    state.history.splice(state.historyIndex + 1);
+    state.history.push({ pads, links });
+    showPatch(state.history.length - 1);
+  }
 
-      function currentMasterLevel(now) {
-        const { startValue, targetValue, startTime, duration } = state.volumeRamp;
-        if (!duration || now >= startTime + duration) return targetValue;
-        const progress = Math.max(0, (now - startTime) / duration);
-        return startValue + (targetValue - startValue) * progress;
+  function showPatch(index) {
+    if (index < 0 || index >= state.history.length) return;
+    releaseAll();
+    state.historyIndex = index;
+    state.pads = state.history[index].pads;
+    state.links = state.history[index].links;
+    renderPads();
+    renderWires();
+    updateAudioRouting();
+    historyPosition.value = `SET ${index + 1} / ${state.history.length}`;
+    historyBack.disabled = index === 0;
+    historyForward.disabled = index === state.history.length - 1;
+  }
+
+  function frequency(midi) {
+    return 440 * (2 ** ((midi - 69) / 12));
+  }
+
+  function noteName(midi) {
+    return `${noteNames[midi % 12]}${Math.floor(midi / 12) - 1}`;
+  }
+
+  function waveShape(type, seed) {
+    const paths = [
+      "M0 25 C12 25 12 7 24 7 S36 43 48 43 60 9 72 9 84 40 96 40 108 15 120 15 132 34 144 34 156 10 168 10 180 25 192 25 204 6 216 6 228 25 240 25",
+      "M0 26 L16 26 22 11 29 40 38 17 46 34 53 22 62 27 70 12 78 39 88 19 96 29 107 24 117 9 126 41 136 18 147 34 155 22 164 28 174 13 182 38 192 19 202 31 211 25 220 10 230 40 240 23",
+      "M0 26 C10 7 20 7 30 26 S50 45 60 26 80 7 90 26 110 45 120 26 140 7 150 26 170 45 180 26 200 7 210 26 230 45 240 26",
+      "M0 26 C8 6 16 6 24 26 S40 46 48 26 64 6 72 26 88 46 96 26 112 6 120 26 136 46 144 26 160 6 168 26 184 46 192 26 208 6 216 26 232 46 240 26",
+      "M0 26 L12 26 12 8 24 8 24 26 36 26 36 44 48 44 48 26 60 26 60 10 72 10 72 26 84 26 84 42 96 42 96 26 108 26 108 7 120 7 120 26 132 26 132 45 144 45 144 26 156 26 156 12 168 12 168 26 180 26 180 39 192 39 192 26 204 26 204 9 216 9 216 26 228 26 228 43 240 43",
+      "M0 26 C14 26 14 9 28 9 S42 41 56 41 70 14 84 14 98 33 112 33 126 7 140 7 154 43 168 43 182 18 196 18 210 30 224 30 232 20 240 20"
+    ];
+    return paths[(type + seed * 7) % paths.length];
+  }
+
+  function renderPads() {
+    padGrid.innerHTML = state.pads.map((pad, index) => {
+      const note = noteName(pad.midi);
+      const pan = Math.round(pad.pan * 2);
+      const readout = `${note} ${Math.round(frequency(pad.midi))}Hz PAN${pan >= 0 ? "+" : ""}${pan} DLY ${Math.round(pad.delayMix * 100)}% REB ${Math.round(pad.reverbMix * 100)}% ${oscillatorLabels[pad.name]}`;
+      return `
+        <button class="pad" type="button" data-pad="${index}" aria-label="Play pad ${index + 1}: ${readout}" aria-keyshortcuts="${index + 1}">
+          <span class="pad-shortcut" aria-hidden="true">${index + 1}</span>
+          <span class="wave-wrap" aria-hidden="true">
+            <svg class="waveform" viewBox="0 0 240 52" preserveAspectRatio="none">
+              <path class="wave-line" d="${waveShape(index, pad.midi % 5)}"></path>
+              <circle class="wave-dots" cx="5" cy="26" r="2"></circle>
+              <circle class="wave-dots" cx="235" cy="26" r="2"></circle>
+            </svg>
+          </span>
+          <span class="pad-readout" aria-hidden="true">
+            <strong>${note} ${Math.round(frequency(pad.midi))}Hz</strong>
+            <i class="filter-readout">F ${Math.round(pad.cutoff)}Hz · Q ${pad.resonance.toFixed(1)}</i>
+            <i>DLY ${Math.round(pad.delayMix * 100)}%</i>
+            <i>REB ${Math.round(pad.reverbMix * 100)}%</i>
+            <em>${oscillatorLabels[pad.name]}</em>
+          </span>
+        </button>`;
+    }).join("");
+    padGrid.querySelectorAll(".pad").forEach((padButton) => {
+      const index = Number(padButton.dataset.pad);
+      padButton.style.setProperty("--pad-accent", state.pads[index].accent);
+      padButton.style.setProperty("--pad-angle", `${state.pads[index].angle}deg`);
+      bindPadGesture(padButton, index);
+    });
+  }
+
+  function renderWires() {
+    const bounds = stage.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    wires.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
+    const centerOf = (pad) => {
+      const rect = pad.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2 - bounds.left, y: rect.top + rect.height / 2 - bounds.top };
+    };
+    const edgeCenter = (pad, angle, towardX, towardY) => {
+      const center = centerOf(pad);
+      const radians = angle * Math.PI / 180;
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
+      const localX = towardX * cos + towardY * sin;
+      const localY = -towardX * sin + towardY * cos;
+      const horizontal = Math.abs(localX) / pad.offsetWidth >= Math.abs(localY) / pad.offsetHeight;
+      const x = horizontal ? Math.sign(localX || 1) * pad.offsetWidth / 2 : 0;
+      const y = horizontal ? 0 : Math.sign(localY || 1) * pad.offsetHeight / 2;
+      return { x: center.x + x * cos - y * sin, y: center.y + x * sin + y * cos };
+    };
+    wires.innerHTML = state.links.map(([from, to], index) => {
+      const sourcePad = padGrid.querySelector(`[data-pad="${from}"]`);
+      const targetPad = padGrid.querySelector(`[data-pad="${to}"]`);
+      const sourceCenter = centerOf(sourcePad);
+      const targetCenter = centerOf(targetPad);
+      const source = edgeCenter(sourcePad, state.pads[from].angle, targetCenter.x - sourceCenter.x, targetCenter.y - sourceCenter.y);
+      const target = edgeCenter(targetPad, state.pads[to].angle, sourceCenter.x - targetCenter.x, sourceCenter.y - targetCenter.y);
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const length = Math.hypot(dx, dy) || 1;
+      const bend = (index % 2 ? 1 : -1) * Math.min(38, length * .08);
+      const perpendicularX = -dy / length * bend;
+      const perpendicularY = dx / length * bend;
+      const c1x = source.x + dx * .35 + perpendicularX;
+      const c1y = source.y + dy * .35 + perpendicularY;
+      const c2x = source.x + dx * .65 + perpendicularX;
+      const c2y = source.y + dy * .65 + perpendicularY;
+      return `<path class="wire" d="M ${source.x} ${source.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${target.x} ${target.y}"></path><circle class="wire-dot" cx="${source.x}" cy="${source.y}" r="2.3"></circle><circle class="wire-dot" cx="${target.x}" cy="${target.y}" r="2.3"></circle>`;
+    }).join("");
+  }
+
+  function announce(message) {
+    notice.textContent = message;
+    notice.classList.add("visible");
+    window.clearTimeout(state.noticeTimer);
+    state.noticeTimer = window.setTimeout(() => notice.classList.remove("visible"), 2300);
+  }
+
+  function createImpulse(context) {
+    const duration = 1.7;
+    const length = Math.floor(context.sampleRate * duration);
+    const impulse = context.createBuffer(2, length, context.sampleRate);
+    for (let channel = 0; channel < 2; channel += 1) {
+      const data = impulse.getChannelData(channel);
+      for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * ((1 - i / length) ** 2.4);
+    }
+    return impulse;
+  }
+
+  async function ensureAudio() {
+    if (!state.audio) {
+      const AudioContextClass = window.AudioContext;
+      if (!AudioContextClass) throw new Error("Web Audio is not available in this browser.");
+      const context = new AudioContextClass();
+      state.audio = context;
+      state.master = context.createGain();
+      state.master.gain.value = state.masterLevel / 100;
+      const limiter = context.createDynamicsCompressor();
+      limiter.threshold.value = -10;
+      limiter.knee.value = 12;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
+      state.master.connect(limiter);
+      limiter.connect(context.destination);
+      state.buses = state.pads.map(() => context.createGain());
+      state.buses.forEach((bus) => { bus.gain.value = 0.78; });
+      const impulse = createImpulse(context);
+      state.reverbs = state.pads.map((_, index) => {
+        const convolver = context.createConvolver();
+        const returnGain = context.createGain();
+        convolver.buffer = impulse;
+        returnGain.gain.value = 0.42;
+        convolver.connect(returnGain);
+        returnGain.connect(state.buses[index]);
+        return convolver;
+      });
+      updateAudioRouting();
+    }
+    if (state.audio.state !== "running") await state.audio.resume();
+    return state.audio;
+  }
+
+  function updateAudioRouting() {
+    if (!state.audio) return;
+    const context = state.audio;
+    state.buses.forEach((bus) => {
+      bus.disconnect();
+      bus.connect(state.master);
+    });
+    state.links.forEach(([from, to]) => {
+      const route = context.createGain();
+      route.gain.value = 0.17;
+      state.buses[from].connect(route);
+      route.connect(state.buses[to]);
+    });
+  }
+
+  function addOscillator(context, destination, type, hz, detune = 0, gainValue = 1) {
+    const oscillator = context.createOscillator();
+    const level = context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.value = hz;
+    oscillator.detune.value = detune;
+    level.gain.value = gainValue;
+    oscillator.connect(level);
+    level.connect(destination);
+    return oscillator;
+  }
+
+  async function play(index, gate) {
+    try {
+      const pad = gate.pad;
+      const context = await ensureAudio();
+      if (gate.cancelled || signal.aborted || state.pads[index] !== pad) return;
+      if (activeVoices.size >= 24) {
+        const oldest = activeVoices.values().next().value;
+        oldest.release(true);
+        oldest.cleanup();
       }
+      const now = context.currentTime;
+      const baseHz = frequency(pad.midi);
+      const hz = baseHz * (2 ** (randomBetween(-0.06, 0.06) / 12));
+      const envelope = context.createGain();
+      const settings = { ...envelopeSettings };
+      const attack = settings.attack;
+      const release = settings.release;
+      const attackDuration = settings.attack;
+      const decayDuration = settings.decay;
+      const releaseDuration = settings.release;
+      const decayEnd = now + attackDuration + decayDuration;
+      const minimumReleaseStart = decayEnd + settings.sustain;
+      const voiceDuration = attackDuration + decayDuration + settings.sustain + releaseDuration;
+      const peakLevel = 0.55;
+      const sustainLevel = 0.33;
+      envelope.gain.setValueCurveAtTime(curveSamples(0.0001, peakLevel, settings.attackCurve), now, attackDuration);
+      envelope.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
+      const voices = [];
 
-      function setMasterVolume(value, smooth = false) {
-        const target = Math.max(0, Math.min(100, value));
-        const now = state.audio?.currentTime ?? 0;
-        const start = state.audio ? currentMasterLevel(now) : target;
-        state.masterLevel = target;
-        masterVolume.value = String(target);
-        updateVolumeDisplay(target);
-
-        if (state.master && state.audio) {
-          state.master.gain.cancelScheduledValues(now);
-          state.master.gain.setValueAtTime(start / 100, now);
-          const duration = smooth ? 0.5 : 0;
-          if (duration) state.master.gain.linearRampToValueAtTime(target / 100, now + duration);
-          else state.master.gain.setValueAtTime(target / 100, now);
-          state.volumeRamp = { startValue: start, targetValue: target, startTime: now, duration };
-        } else {
-          state.volumeRamp = { startValue: target, targetValue: target, startTime: now, duration: 0 };
-        }
-      }
-
-      updateVolumeDisplay(state.masterLevel);
-
-      function randomBetween(min, max) {
-        return min + Math.random() * (max - min);
-      }
-
-      function shuffled(items) {
-        const copy = [...items];
-        for (let i = copy.length - 1; i > 0; i -= 1) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [copy[i], copy[j]] = [copy[j], copy[i]];
-        }
-        return copy;
-      }
-
-      function makePatch() {
-        const types = shuffled(synthTypes);
-        const pads = types.map((type, index) => {
-          const midi = Math.floor(randomBetween(48, 73));
-          return {
-            ...type, index, midi,
-            angle: randomBetween(-2.2, 2.2),
-            pan: randomBetween(-1, 1),
-            delay: randomBetween(0.07, 0.42),
-            delayMix: randomBetween(0.08, 0.32),
-            reverbMix: randomBetween(0.08, 0.55),
-            cutoff: randomBetween(550, 5400),
-            resonance: randomBetween(1, 9),
-            detune: randomBetween(4, 28),
-            modulation: randomBetween(1.4, 4.8)
-          };
-        });
-        const order = shuffled(pads.map((pad) => pad.index));
-        const possibleLinks = [];
-        for (let from = 0; from < order.length; from += 1) {
-          for (let to = from + 1; to < order.length; to += 1) {
-            if (Math.random() < 0.38) possibleLinks.push([order[from], order[to]]);
-          }
-        }
-        const links = shuffled(possibleLinks).slice(0, Math.floor(randomBetween(4, 8)));
-        state.history.splice(state.historyIndex + 1);
-        state.history.push({ pads, links });
-        showPatch(state.history.length - 1);
-      }
-
-      function showPatch(index) {
-        if (index < 0 || index >= state.history.length) return;
-        state.historyIndex = index;
-        state.pads = state.history[index].pads;
-        state.links = state.history[index].links;
-        renderPads();
-        renderWires();
-        updateAudioRouting();
-        historyPosition.value = `PATCH ${index + 1} / ${state.history.length}`;
-        historyBack.disabled = index === 0;
-        historyForward.disabled = index === state.history.length - 1;
-      }
-
-      function frequency(midi) {
-        return 440 * (2 ** ((midi - 69) / 12));
-      }
-
-      function noteName(midi) {
-        return `${noteNames[midi % 12]}${Math.floor(midi / 12) - 1}`;
-      }
-
-      function waveShape(type, seed) {
-        const paths = [
-          "M0 25 C12 25 12 7 24 7 S36 43 48 43 60 9 72 9 84 40 96 40 108 15 120 15 132 34 144 34 156 10 168 10 180 25 192 25 204 6 216 6 228 25 240 25",
-          "M0 26 L16 26 22 11 29 40 38 17 46 34 53 22 62 27 70 12 78 39 88 19 96 29 107 24 117 9 126 41 136 18 147 34 155 22 164 28 174 13 182 38 192 19 202 31 211 25 220 10 230 40 240 23",
-          "M0 26 C10 7 20 7 30 26 S50 45 60 26 80 7 90 26 110 45 120 26 140 7 150 26 170 45 180 26 200 7 210 26 230 45 240 26",
-          "M0 26 C8 6 16 6 24 26 S40 46 48 26 64 6 72 26 88 46 96 26 112 6 120 26 136 46 144 26 160 6 168 26 184 46 192 26 208 6 216 26 232 46 240 26",
-          "M0 26 L12 26 12 8 24 8 24 26 36 26 36 44 48 44 48 26 60 26 60 10 72 10 72 26 84 26 84 42 96 42 96 26 108 26 108 7 120 7 120 26 132 26 132 45 144 45 144 26 156 26 156 12 168 12 168 26 180 26 180 39 192 39 192 26 204 26 204 9 216 9 216 26 228 26 228 43 240 43",
-          "M0 26 C14 26 14 9 28 9 S42 41 56 41 70 14 84 14 98 33 112 33 126 7 140 7 154 43 168 43 182 18 196 18 210 30 224 30 232 20 240 20"
-        ];
-        return paths[(type + seed * 7) % paths.length];
-      }
-
-      function renderPads() {
-        padGrid.innerHTML = state.pads.map((pad, index) => {
-          const note = noteName(pad.midi);
-          const pan = Math.round(pad.pan * 2);
-          const readout = `${note} ${Math.round(frequency(pad.midi))}Hz PAN${pan >= 0 ? "+" : ""}${pan} DLY ${Math.round(pad.delayMix * 100)}% REB ${Math.round(pad.reverbMix * 100)}% ${oscillatorLabels[pad.name]}`;
-          return `
-            <button class="pad" type="button" data-pad="${index}" aria-label="Play pad ${index + 1}: ${readout}" aria-keyshortcuts="${index + 1}">
-              <span class="pad-shortcut" aria-hidden="true">${index + 1}</span>
-              <span class="wave-wrap" aria-hidden="true">
-                <svg class="waveform" viewBox="0 0 240 52" preserveAspectRatio="none">
-                  <path class="wave-line" d="${waveShape(index, pad.midi % 5)}"></path>
-                  <circle class="wave-dots" cx="5" cy="26" r="2"></circle>
-                  <circle class="wave-dots" cx="235" cy="26" r="2"></circle>
-                </svg>
-              </span>
-              <span class="pad-readout" aria-hidden="true">
-                <strong>${note} ${Math.round(frequency(pad.midi))}Hz</strong>
-                <i>PAN${pan >= 0 ? "+" : ""}${pan}</i>
-                <i>DLY ${Math.round(pad.delayMix * 100)}%</i>
-                <i>REB ${Math.round(pad.reverbMix * 100)}%</i>
-                <em>${oscillatorLabels[pad.name]}</em>
-              </span>
-            </button>`;
-        }).join("");
-        padGrid.querySelectorAll(".pad").forEach((padButton) => {
-          const index = Number(padButton.dataset.pad);
-          padButton.style.setProperty("--pad-accent", state.pads[index].accent);
-          padButton.style.setProperty("--pad-angle", `${state.pads[index].angle}deg`);
-          padButton.addEventListener("click", () => { void play(index); });
-        });
-      }
-
-      function renderWires() {
-        const bounds = stage.getBoundingClientRect();
-        if (!bounds.width || !bounds.height) return;
-        wires.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
-        const centerOf = (pad) => {
-          const rect = pad.getBoundingClientRect();
-          return { x: rect.left + rect.width / 2 - bounds.left, y: rect.top + rect.height / 2 - bounds.top };
-        };
-        const edgeCenter = (pad, angle, towardX, towardY) => {
-          const center = centerOf(pad);
-          const radians = angle * Math.PI / 180;
-          const cos = Math.cos(radians);
-          const sin = Math.sin(radians);
-          const localX = towardX * cos + towardY * sin;
-          const localY = -towardX * sin + towardY * cos;
-          const horizontal = Math.abs(localX) / pad.offsetWidth >= Math.abs(localY) / pad.offsetHeight;
-          const x = horizontal ? Math.sign(localX || 1) * pad.offsetWidth / 2 : 0;
-          const y = horizontal ? 0 : Math.sign(localY || 1) * pad.offsetHeight / 2;
-          return { x: center.x + x * cos - y * sin, y: center.y + x * sin + y * cos };
-        };
-        wires.innerHTML = state.links.map(([from, to], index) => {
-          const sourcePad = padGrid.querySelector(`[data-pad="${from}"]`);
-          const targetPad = padGrid.querySelector(`[data-pad="${to}"]`);
-          const sourceCenter = centerOf(sourcePad);
-          const targetCenter = centerOf(targetPad);
-          const source = edgeCenter(sourcePad, state.pads[from].angle, targetCenter.x - sourceCenter.x, targetCenter.y - sourceCenter.y);
-          const target = edgeCenter(targetPad, state.pads[to].angle, sourceCenter.x - targetCenter.x, sourceCenter.y - targetCenter.y);
-          const dx = target.x - source.x;
-          const dy = target.y - source.y;
-          const length = Math.hypot(dx, dy) || 1;
-          const bend = (index % 2 ? 1 : -1) * Math.min(38, length * .08);
-          const perpendicularX = -dy / length * bend;
-          const perpendicularY = dx / length * bend;
-          const c1x = source.x + dx * .35 + perpendicularX;
-          const c1y = source.y + dy * .35 + perpendicularY;
-          const c2x = source.x + dx * .65 + perpendicularX;
-          const c2y = source.y + dy * .65 + perpendicularY;
-          return `<path class="wire" d="M ${source.x} ${source.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${target.x} ${target.y}"></path><circle class="wire-dot" cx="${source.x}" cy="${source.y}" r="2.3"></circle><circle class="wire-dot" cx="${target.x}" cy="${target.y}" r="2.3"></circle>`;
-        }).join("");
-      }
-
-      function announce(message) {
-        notice.textContent = message;
-        notice.classList.add("visible");
-        window.clearTimeout(state.noticeTimer);
-        state.noticeTimer = window.setTimeout(() => notice.classList.remove("visible"), 2300);
-      }
-
-      function createImpulse(context) {
-        const duration = 1.7;
-        const length = Math.floor(context.sampleRate * duration);
-        const impulse = context.createBuffer(2, length, context.sampleRate);
-        for (let channel = 0; channel < 2; channel += 1) {
-          const data = impulse.getChannelData(channel);
-          for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * ((1 - i / length) ** 2.4);
-        }
-        return impulse;
-      }
-
-      function updateMasterMeter() {
-        if (!state.analyser || !state.meterData || !state.audio || state.audio.state !== "running") {
-          masterMeterFill.style.width = "0";
-          masterMeter.setAttribute("aria-valuenow", "0");
-          state.meterFrame = 0;
-          return;
-        }
-        state.analyser.getFloatTimeDomainData(state.meterData);
-        const sum = state.meterData.reduce((total, sample) => total + sample * sample, 0);
-        const level = Math.min(100, Math.round(Math.sqrt(sum / state.meterData.length) * 240));
-        masterMeterFill.style.width = `${level}%`;
-        masterMeter.setAttribute("aria-valuenow", String(level));
-        state.meterFrame = window.requestAnimationFrame(updateMasterMeter);
-      }
-
-      async function ensureAudio() {
-        if (!state.audio) {
-          const AudioContextClass = window.AudioContext;
-          if (!AudioContextClass) throw new Error("Web Audio is not available in this browser.");
-          const context = new AudioContextClass();
-          state.audio = context;
-          state.master = context.createGain();
-          state.master.gain.value = state.masterLevel / 100;
-          state.analyser = context.createAnalyser();
-          state.analyser.fftSize = 256;
-          state.meterData = new Float32Array(state.analyser.fftSize);
-          state.master.connect(state.analyser);
-          state.analyser.connect(context.destination);
-          state.buses = state.pads.map(() => context.createGain());
-          state.buses.forEach((bus) => { bus.gain.value = 0.78; });
-          const impulse = createImpulse(context);
-          state.reverbs = state.pads.map((_, index) => {
-            const convolver = context.createConvolver();
-            const returnGain = context.createGain();
-            convolver.buffer = impulse;
-            returnGain.gain.value = 0.42;
-            convolver.connect(returnGain);
-            returnGain.connect(state.buses[index]);
-            return convolver;
-          });
-          updateAudioRouting();
-        }
-        if (state.audio.state !== "running") await state.audio.resume();
-        if (!state.meterFrame) updateMasterMeter();
-        return state.audio;
-      }
-
-      function updateAudioRouting() {
-        if (!state.audio) return;
-        const context = state.audio;
-        state.buses.forEach((bus) => {
-          bus.disconnect();
-          bus.connect(state.master);
-        });
-        state.links.forEach(([from, to]) => {
-          const route = context.createGain();
-          route.gain.value = 0.17;
-          state.buses[from].connect(route);
-          route.connect(state.buses[to]);
-        });
-      }
-
-      function addOscillator(context, destination, type, hz, detune = 0, gainValue = 1) {
+      if (pad.name === "Additive") {
+        [1, 2, 3, 4].forEach((partial, i) => voices.push(addOscillator(context, envelope, "sine", hz * partial, randomBetween(-5, 5), 0.42 / (i + 1))));
+      } else if (pad.name === "Subtractive") {
+        const filter = context.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = pad.cutoff;
+        filter.Q.value = pad.resonance;
         const oscillator = context.createOscillator();
-        const level = context.createGain();
-        oscillator.type = type;
+        oscillator.type = "sawtooth";
         oscillator.frequency.value = hz;
-        oscillator.detune.value = detune;
-        level.gain.value = gainValue;
-        oscillator.connect(level);
-        level.connect(destination);
-        return oscillator;
+        oscillator.connect(filter);
+        filter.connect(envelope);
+        voices.push(oscillator);
+      } else if (pad.name === "FM") {
+        const carrier = context.createOscillator();
+        const modulator = context.createOscillator();
+        const modDepth = context.createGain();
+        carrier.type = "sine";
+        carrier.frequency.value = hz;
+        modulator.type = "sine";
+        modulator.frequency.value = hz * pad.modulation;
+        modDepth.gain.value = hz * pad.modulation * randomBetween(0.8, 2.4);
+        modulator.connect(modDepth);
+        modDepth.connect(carrier.frequency);
+        carrier.connect(envelope);
+        voices.push(carrier, modulator);
+      } else if (pad.name === "Ring Mod") {
+        const carrier = context.createOscillator();
+        const modulator = context.createOscillator();
+        const ring = context.createGain();
+        carrier.type = "sawtooth";
+        carrier.frequency.value = hz;
+        modulator.type = "sine";
+        modulator.frequency.value = hz * randomBetween(1.8, 3.6);
+        ring.gain.value = 0;
+        modulator.connect(ring.gain);
+        carrier.connect(ring);
+        ring.connect(envelope);
+        voices.push(carrier, modulator);
+      } else if (pad.name === "Supersaw") {
+        [-2, -1, 0, 1, 2].forEach((voice) => voices.push(addOscillator(context, envelope, "sawtooth", hz, voice * pad.detune, 0.2)));
+      } else {
+        const filter = context.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(Math.min(pad.cutoff * 2.5, 12000), now);
+        filter.frequency.exponentialRampToValueAtTime(Math.max(pad.cutoff * .45, 180), now + voiceDuration);
+        filter.Q.value = pad.resonance * 1.8;
+        const oscillator = context.createOscillator();
+        oscillator.type = "triangle";
+        oscillator.frequency.value = hz;
+        oscillator.connect(filter);
+        filter.connect(envelope);
+        voices.push(oscillator);
       }
 
-      async function play(index) {
-        try {
-          const context = await ensureAudio();
-          const pad = state.pads[index];
-          const now = context.currentTime;
-          const baseHz = frequency(pad.midi);
-          const hz = baseHz * (2 ** (randomBetween(-0.06, 0.06) / 12));
-          const envelope = context.createGain();
-          const attack = Number(attackTime.value);
-          const attackDuration = Math.max(attack, 0.005);
-          const decay = Number(decayTime.value);
-          const decayDuration = Math.max(decay, 0.005);
-          const sustain = Number(sustainTime.value);
-          const release = Number(releaseTime.value);
-          const releaseDuration = Math.max(release, 0.005);
-          const decayEnd = now + attackDuration + decayDuration;
-          const releaseStart = decayEnd + sustain;
-          const voiceDuration = attackDuration + decayDuration + sustain + releaseDuration;
-          const peakLevel = 0.55;
-          const sustainLevel = 0.33;
-          envelope.gain.setValueAtTime(0.0001, now);
-          envelope.gain.linearRampToValueAtTime(peakLevel, now + attackDuration);
-          envelope.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
-          envelope.gain.setValueAtTime(sustainLevel, releaseStart);
-          envelope.gain.exponentialRampToValueAtTime(0.0001, releaseStart + releaseDuration);
-          const voices = [];
-
-          if (pad.name === "Additive") {
-            [1, 2, 3, 4].forEach((partial, i) => voices.push(addOscillator(context, envelope, "sine", hz * partial, randomBetween(-5, 5), 0.42 / (i + 1))));
-          } else if (pad.name === "Subtractive") {
-            const filter = context.createBiquadFilter();
-            filter.type = "lowpass";
-            filter.frequency.value = pad.cutoff;
-            filter.Q.value = pad.resonance;
-            const oscillator = context.createOscillator();
-            oscillator.type = "sawtooth";
-            oscillator.frequency.value = hz;
-            oscillator.connect(filter);
-            filter.connect(envelope);
-            voices.push(oscillator);
-          } else if (pad.name === "FM") {
-            const carrier = context.createOscillator();
-            const modulator = context.createOscillator();
-            const modDepth = context.createGain();
-            carrier.type = "sine";
-            carrier.frequency.value = hz;
-            modulator.type = "sine";
-            modulator.frequency.value = hz * pad.modulation;
-            modDepth.gain.value = hz * pad.modulation * randomBetween(0.8, 2.4);
-            modulator.connect(modDepth);
-            modDepth.connect(carrier.frequency);
-            carrier.connect(envelope);
-            voices.push(carrier, modulator);
-          } else if (pad.name === "Ring Mod") {
-            const carrier = context.createOscillator();
-            const modulator = context.createOscillator();
-            const ring = context.createGain();
-            carrier.type = "sawtooth";
-            carrier.frequency.value = hz;
-            modulator.type = "sine";
-            modulator.frequency.value = hz * randomBetween(1.8, 3.6);
-            ring.gain.value = 0;
-            modulator.connect(ring.gain);
-            carrier.connect(ring);
-            ring.connect(envelope);
-            voices.push(carrier, modulator);
-          } else if (pad.name === "Supersaw") {
-            [-2, -1, 0, 1, 2].forEach((voice) => voices.push(addOscillator(context, envelope, "sawtooth", hz, voice * pad.detune, 0.2)));
-          } else {
-            const filter = context.createBiquadFilter();
-            filter.type = "lowpass";
-            filter.frequency.setValueAtTime(Math.min(pad.cutoff * 2.5, 12000), now);
-            filter.frequency.exponentialRampToValueAtTime(Math.max(pad.cutoff * .45, 180), now + voiceDuration);
-            filter.Q.value = pad.resonance * 1.8;
-            const oscillator = context.createOscillator();
-            oscillator.type = "triangle";
-            oscillator.frequency.value = hz;
-            oscillator.connect(filter);
-            filter.connect(envelope);
-            voices.push(oscillator);
-          }
-
-          const panner = context.createStereoPanner();
-          if (dynamicPanic.checked) {
-            const panDuration = attack + release || 1;
-            const startPan = Math.max(-1, Math.min(1, pad.pan));
-            panner.pan.setValueAtTime(startPan, now);
-            panner.pan.linearRampToValueAtTime(-startPan, now + panDuration);
-          } else {
-            panner.pan.value = Math.max(-1, Math.min(1, pad.pan));
-          }
-          const dry = context.createGain();
-          dry.gain.value = 0.78;
-          const delaySend = context.createGain();
-          delaySend.gain.value = pad.delayMix;
-          const delay = context.createDelay(1);
-          delay.delayTime.value = pad.delay;
-          const delayFeedback = context.createGain();
-          delayFeedback.gain.value = 0.18;
-          const delayReturn = context.createGain();
-          delayReturn.gain.value = 0.5;
-          const reverbSend = context.createGain();
-          reverbSend.gain.value = pad.reverbMix * 0.58;
-          envelope.connect(panner);
-          panner.connect(dry);
-          dry.connect(state.buses[index]);
-          panner.connect(delaySend);
-          delaySend.connect(delay);
-          delay.connect(delayFeedback);
-          delayFeedback.connect(delay);
-          delay.connect(delayReturn);
-          delayReturn.connect(state.buses[index]);
-          panner.connect(reverbSend);
-          reverbSend.connect(state.reverbs[index]);
-
-          voices.forEach((oscillator) => {
-            oscillator.start(now);
-            oscillator.stop(now + voiceDuration + 0.08);
-          });
-          const padButton = padGrid.querySelector(`[data-pad="${index}"]`);
-          padButton.classList.add("is-playing");
-          window.setTimeout(() => padButton.classList.remove("is-playing"), 260);
-          window.setTimeout(() => {
-            envelope.disconnect();
-            panner.disconnect();
-            dry.disconnect();
-            delaySend.disconnect();
-            delay.disconnect();
-            delayFeedback.disconnect();
-            delayReturn.disconnect();
-            reverbSend.disconnect();
-          }, (voiceDuration + 2.2) * 1000);
-        } catch (error) {
-          announce(error instanceof Error ? error.message : "Unable to start audio.");
-        }
+      const panner = context.createStereoPanner();
+      {
+        const panDuration = attack + release || 1;
+        const startPan = Math.max(-1, Math.min(1, pad.pan));
+        panner.pan.setValueAtTime(startPan, now);
+        panner.pan.linearRampToValueAtTime(-startPan, now + panDuration);
       }
+      const dry = context.createGain();
+      dry.gain.value = 0.78;
+      const delaySend = context.createGain();
+      delaySend.gain.value = pad.delayMix;
+      const delay = context.createDelay(1);
+      delay.delayTime.value = pad.delay;
+      const delayFeedback = context.createGain();
+      delayFeedback.gain.value = 0.18;
+      const delayReturn = context.createGain();
+      delayReturn.gain.value = 0.5;
+      const reverbSend = context.createGain();
+      reverbSend.gain.value = pad.reverbMix * 0.58;
+      const gestureFilter = context.createBiquadFilter();
+      gestureFilter.type = 'lowpass';
+      gestureFilter.frequency.value = Math.min(pad.cutoff, context.sampleRate * 0.45);
+      gestureFilter.Q.value = pad.resonance;
+      envelope.connect(gestureFilter);
+      gestureFilter.connect(panner);
+      panner.connect(dry);
+      dry.connect(state.buses[index]);
+      panner.connect(delaySend);
+      delaySend.connect(delay);
+      delay.connect(delayFeedback);
+      delayFeedback.connect(delay);
+      delay.connect(delayReturn);
+      delayReturn.connect(state.buses[index]);
+      panner.connect(reverbSend);
+      reverbSend.connect(state.reverbs[index]);
 
-      masterVolume.addEventListener("input", () => {
-        setMasterVolume(Number(masterVolume.value));
-      });
+      const padButton = padGrid.querySelector(`[data-pad="${index}"]`);
+      padButton.classList.add('is-playing');
+      let released = false;
+      let cleaned = false;
+      let releaseAt = null;
+      let releaseFrom = sustainLevel;
+      let releaseLength = releaseDuration;
+      let releaseShape = settings.releaseCurve;
+      const currentLevel = (time) => {
+        if (releaseAt !== null && time >= releaseAt) return releaseFrom * (1 - curveValue(releaseShape, (time - releaseAt) / releaseLength));
+        const elapsed = time - now;
+        if (elapsed < attackDuration) return 0.0001 + (peakLevel - 0.0001) * curveValue(settings.attackCurve, elapsed / attackDuration);
+        if (time < decayEnd) return peakLevel + (sustainLevel - peakLevel) * (time - now - attackDuration) / decayDuration;
+        return sustainLevel;
+      };
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        activeVoices.delete(voice);
+        for (const node of [envelope, gestureFilter, panner, dry, delaySend, delay, delayFeedback, delayReturn, reverbSend]) node.disconnect();
+        if (![...activeVoices].some((other) => other.button === padButton)) padButton.classList.remove('is-playing');
+      };
+      const voice = {
+        pad, button: padButton, filter: gestureFilter, cleanup,
+        release(immediate = false) {
+          if (cleaned || (released && !immediate)) return;
+          const time = context.currentTime;
+          if (immediate) {
+            releaseFrom = Math.max(0.0001, currentLevel(time));
+            envelope.gain.cancelScheduledValues(0);
+            envelope.gain.setValueAtTime(releaseFrom, time);
+          }
+          releaseAt = immediate ? time : Math.max(time, minimumReleaseStart);
+          releaseLength = immediate ? 0.02 : envelopeSettings.release;
+          releaseShape = immediate ? 'linear' : envelopeSettings.releaseCurve;
+          if (immediate) envelope.gain.linearRampToValueAtTime(0, releaseAt + releaseLength);
+          else envelope.gain.setValueCurveAtTime(curveSamples(sustainLevel, 0, releaseShape), releaseAt, releaseLength);
+          released = true;
+          const stop = releaseAt + releaseLength + 0.03;
+          for (const oscillator of voices) oscillator.stop(stop);
+          later(cleanup, (stop - time + 2.2) * 1000);
+        },
+      };
+      activeVoices.add(voice);
+      for (const oscillator of voices) oscillator.start(now);
+      gate.voice = voice;
+      if (gate.released) voice.release();
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Unable to start audio.");
+    }
+  }
 
-      attackTime.addEventListener("input", () => {
-        attackValue.value = `${Number(attackTime.value).toFixed(2)}s`;
-      });
-      decayTime.addEventListener("input", () => {
-        decayValue.value = `${Number(decayTime.value).toFixed(2)}s`;
-      });
-      sustainTime.addEventListener("input", () => {
-        sustainValue.value = `${Number(sustainTime.value).toFixed(2)}s`;
-      });
-      releaseTime.addEventListener("input", () => {
-        releaseValue.value = `${Number(releaseTime.value).toFixed(2)}s`;
-      });
+  rerollButton.addEventListener("click", makePatch);
+  historyBack.addEventListener("click", () => showPatch(state.historyIndex - 1));
+  historyForward.addEventListener("click", () => showPatch(state.historyIndex + 1));
 
-      rerollButton.addEventListener("click", makePatch);
-      historyBack.addEventListener("click", () => showPatch(state.historyIndex - 1));
-      historyForward.addEventListener("click", () => showPatch(state.historyIndex + 1));
-
-      document.addEventListener("keydown", (event) => {
-        if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-        const target = event.target;
-        const isFormControl = target instanceof HTMLInputElement
-          || target instanceof HTMLTextAreaElement
-          || target instanceof HTMLSelectElement
-          || (target instanceof HTMLElement && target.isContentEditable);
-        if ((event.key === "ArrowUp" || event.key === "ArrowDown") && (!isFormControl || target === masterVolume)) {
-          event.preventDefault();
-          const currentStep = Number(masterVolume.value) / 20;
-          const nextStep = event.key === "ArrowUp" ? Math.floor(currentStep) + 1 : Math.ceil(currentStep) - 1;
-          setMasterVolume(Math.max(0, Math.min(5, nextStep)) * 20, true);
-          return;
-        }
-        if (!isFormControl && (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.code === "Space")) {
-          event.preventDefault();
-          const forward = event.key === "ArrowRight" || (event.code === "Space" && event.shiftKey);
-          showPatch(state.historyIndex + (forward ? 1 : -1));
-          return;
-        }
-        if (/^[1-6]$/.test(event.key)) {
-          void play(Number(event.key) - 1);
-        } else if (event.key.toLowerCase() === "r" && !isFormControl) {
-          makePatch();
-        }
-      });
-
-      const resizeObserver = new ResizeObserver(renderWires);
-      resizeObserver.observe(stage);
-      window.addEventListener("resize", renderWires);
+  document.addEventListener("keydown", (event) => {
+    if (document.querySelector('#hero-modal[open]')) return;
+    if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    const isFormControl = target instanceof HTMLInputElement
+      || target instanceof HTMLTextAreaElement
+      || target instanceof HTMLSelectElement
+      || (target instanceof HTMLElement && target.isContentEditable);
+    if ((event.key === "ArrowUp" || event.key === "ArrowDown") && !isFormControl) {
+      event.preventDefault();
+      const currentStep = state.masterLevel / 20;
+      const nextStep = event.key === "ArrowUp" ? Math.floor(currentStep) + 1 : Math.ceil(currentStep) - 1;
+      setMasterVolume(Math.max(0, Math.min(5, nextStep)) * 20, true);
+      return;
+    }
+    if (!isFormControl && (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.code === "Space")) {
+      event.preventDefault();
+      const forward = event.key === "ArrowRight" || (event.code === "Space" && event.shiftKey);
+      showPatch(state.historyIndex + (forward ? 1 : -1));
+      return;
+    }
+    if (!isFormControl && /^[1-6]$/.test(event.key)) {
+      event.preventDefault();
+      beginGate(Number(event.key) - 1, `key:${event.code || event.key}`);
+    } else if (event.key.toLowerCase() === "r" && !isFormControl) {
       makePatch();
-    })();
-  </script>
+    }
+  }, { signal });
+
+  document.addEventListener('keyup', (event) => endGate(`key:${event.code || event.key}`), { signal });
+  window.addEventListener('blur', releaseAll, { signal });
+  // A modal makes the pads inert, so stop held notes before their release can be lost.
+  const dialogObserver = new MutationObserver(() => {
+    if (document.querySelector('#hero-modal[open], #hero-share-dialog[open]')) releaseAll();
+  });
+  for (const dialog of document.querySelectorAll('#hero-modal, #hero-share-dialog')) {
+    dialogObserver.observe(dialog, { attributes: true, attributeFilter: ['open'] });
+  }
+  signal.addEventListener('abort', () => dialogObserver.disconnect(), { once: true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); }, { signal });
+
+  const resizeObserver = new ResizeObserver(renderWires);
+  resizeObserver.observe(stage);
+  window.addEventListener("resize", renderWires, { signal });
+  window.addEventListener('pagehide', (event) => {
+    releaseAll();
+    if (event.persisted) return;
+    for (const voice of [...activeVoices]) voice.cleanup();
+    controller.abort();
+    for (const timer of timers) clearTimeout(timer);
+    timers.clear();
+    resizeObserver.disconnect();
+    clearTimeout(state.noticeTimer);
+    if (state.audio && state.audio.state !== 'closed') void state.audio.close();
+  }, { once: true, signal });
+  makePatch();
+}
+initFieldtone();
+
+
+
+const help = document.getElementById('hero-modal');
+document.getElementById('info-corner').addEventListener('click', () => help.showModal());
+document.getElementById('hero-modal-close').addEventListener('click', () => help.close());
+document.addEventListener('keydown', (event) => {
+  if (event.key.toLowerCase() === 'i' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !help.open) {
+    event.preventDefault(); help.showModal();
+  }
+});
+
+</script>
 </body>
 </html>

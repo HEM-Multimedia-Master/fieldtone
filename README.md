@@ -30,6 +30,15 @@ History belongs to the open page session. Reloading starts over. Generating
 from an earlier set replaces its future entries. Each pad's filter settings
 stay with its set; the ADSR envelope and master volume are shared across sets.
 
+### Crossmix while holding
+
+Keep a pad pressed and drag into another pad. After dwelling inside it for
+**180 ms**, the voices crossfade over **one second** with complementary
+sine/cosine gain curves. Briefly passing through a pad does not switch voices.
+Continue dragging to transition again; release the pointer or finger to end
+the current voice through its release envelope. Nothing stays latched after
+release. Each simultaneous touch has its own transition state.
+
 ### Envelope
 
 Drag the **A, D, S, R** points horizontally to move their time boundaries:
@@ -39,19 +48,25 @@ Drag the **A, D, S, R** points horizontally to move their time boundaries:
 - **Sustain:** minimum time at that level; holding a pad extends it.
 - **Release:** fade to silence after release and the minimum sustain.
 
-Each stage lasts **0.005–5 seconds**. Points cannot cross. Moving A, D, or S
-redistributes time between neighbouring stages while keeping later boundaries
-fixed; moving R changes the release duration. The drawing refits after dragging.
+**Attack and release reach 10 seconds**; decay and sustain reach 5 seconds.
+Every stage has a 0.005-second minimum. Durations are independent: changing
+one moves later boundaries without shortening its neighbours. The drawing
+fits the current total duration, including long attacks and releases.
 
-Drag **A or R vertically** to switch the interpolation curve: **up =
-logarithmic**, **middle = linear**, **down = power**. The visible and audible
-curves use the same interpolation functions. These are discrete curve modes,
-not an amplitude control. Decay remains linear and sustain amplitude stays fixed.
+Drag **A vertically** to set master volume. A muted gray **ppp · pp · p · mf · f**
+scale appears at the bottom-left inside the graph, in small Times italic,
+with the current dynamic highlighted. The graph's peak follows the volume.
+
+Hold **Shift while dragging A vertically**, or drag **R vertically**, to
+switch interpolation: **up = logarithmic**, **middle = linear**,
+**down = power**. The visible and audible curves use the same interpolation
+functions. Decay remains linear; sustain stays at 60% of the peak.
 
 For keyboard editing, Tab to a point and use **Left / Right** to change time
-by 0.01 seconds (**Shift** changes it by 0.1 seconds). On A or R,
-**Up / Down** changes the curve. These arrows edit the focused point instead
-of navigating sets or changing volume.
+by 0.01 seconds (**Shift** changes it by 0.1 seconds). **Home / End** sets the
+stage to its minimum / maximum. On A, **Up / Down** edits volume and
+**Shift+Up / Down** changes the attack curve. On R, **Up / Down** changes its
+curve. Focused-point keys do not navigate sound sets.
 
 Attack, decay, and minimum sustain are captured when a note starts. Release
 time and curve are read when the note is released, so you can adjust R while
@@ -79,16 +94,17 @@ independently, and filter changes are smoothed to avoid abrupt jumps.
 | Previous set | `<`, `←`, or `Space` |
 | Next set | `>`, `→`, or `Shift+Space` |
 | Edit envelope times | Drag A/D/S/R horizontally |
-| Change attack / release curve | Drag A/R vertically |
+| Change attack / release curve | Shift+drag A vertically / drag R vertically |
+| Crossmix | Hold, drag into another pad, and stay inside for 180 ms |
 | Filter a sound | Hold a pad and drag across the window |
-| Change volume | `↑` / `↓`, in 20% steps with a 500 ms fade |
+| Change volume | Drag A vertically, or `↑` / `↓` in 20% steps with a 500 ms fade |
 | Open help | Bottom-left corner button or **`I`**, not L |
 | Close help | Close button or `Esc` |
 
 Master volume starts at **80%**; its six levels are 0, 20, 40, 60, 80, and
-100%. A temporary notice reports changes. There is no top HUD, volume slider,
+100%. The graph highlights the current dynamic; keyboard changes also show a temporary notice. There is no top HUD, volume slider,
 output meter, or dynamic-pan switch. The automatic stereo sweep is enabled.
-Touch-only master-volume editing remains a possible improvement.
+Touch and mouse can edit master volume directly through the attack point.
 
 Held notes are released when the window loses focus, the page becomes hidden,
 help opens, or the sound set changes. Cancelled touches release immediately.
@@ -149,7 +165,7 @@ The inline module is organized into math helpers, the envelope editor, and
 - `ensureAudio()` lazily initializes Web Audio after a playing gesture.
 - `releaseAll()` handles focus changes, dialogs, and sound-set changes safely.
 
-`envelopeSettings` holds four durations plus attack and release curve modes.
+`envelopeSettings` holds four durations plus attack and release curve modes. Master volume controls the height of the graph, so the displayed envelope reflects the output level.
 The gate map tracks independently held inputs; `activeVoices` tracks voices
 and effect tails until their nodes are disconnected. Abortable listeners,
 resize observers, and timer cleanup keep lifecycle handling explicit.
@@ -180,10 +196,9 @@ These principles describe the current instrument and its remaining limitations:
 
 1. **Access:** HTTPS play link, no account, and no external runtime dependencies.
 2. **Ubiquity:** Responsive pads, set navigation, and ADSR editing work with
-   touch or mouse. Keyboard controls are also available. Master volume currently
-   requires a keyboard or the device's own volume controls.
+   touch or mouse. Keyboard controls are also available; A provides touch-accessible master volume.
 3. **Gesture:** Hold/release plays a voice; full-window dragging filters it;
-   envelope points edit timing and curves. Multiple touches are independent.
+   envelope points edit timing, volume, and curves; held drags crossmix voices. Multiple touches are independent.
 4. **Feedback:** Active waveforms, filter readouts, a crosshair, the envelope
    graph, set counter, and status notices expose changes and audio-start errors.
 5. **Control:** Audio requires a playing gesture. Release, cancellation,
@@ -204,9 +219,9 @@ When changing the instrument, check:
   full viewport width, a 15% bottom panel, and reachable envelope points.
 - R and previous/next navigation, disabled history boundaries, and branching
   history when generating from an earlier set.
-- Horizontal envelope edits, all three A/R curves, and keyboard point editing
+- Independent horizontal durations up to 10 seconds for A/R, A vertical volume, all three A/R curves, and keyboard point editing
   without accidentally navigating sets or changing volume.
 - Real audio output, long holds, release tails, full-window filter dragging,
-  and two simultaneous touches controlling different pads.
+  two simultaneous touches controlling different pads, and held crossmix transitions between pads.
 - Release on blur, help opening, and touch cancellation; help focus and Escape.
 - No browser errors or overlapping Web Audio automation errors.

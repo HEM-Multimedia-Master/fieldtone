@@ -56,6 +56,8 @@
   #fieldtone-container #reroll-button { border: 1px solid var(--lime); color: var(--lime); }
   #fieldtone-container .set-controls button:disabled { opacity: .25; cursor: default; }
   #fieldtone-container #history-position { grid-column: 1 / -1; display: grid; place-items: center; font-size: clamp(8px, 1vw, 10px); letter-spacing: .08em; }
+  #fieldtone-container .dynamic-scale { position: absolute; left: 7px; bottom: 3px; display: flex; gap: 7px; pointer-events: none; color: #535856; font: italic 12px/1 "Times New Roman", Times, serif; }
+  #fieldtone-container .dynamic-mark.current { color: #a0a6a2; }
   #fieldtone-container #envelope-editor { min-width: 0; min-height: 0; position: relative; margin: 0; padding: 0; }
   #fieldtone-container #envelope-plot { position: absolute; inset: 0; touch-action: none; user-select: none; }
   #fieldtone-container #envelope-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
@@ -124,30 +126,23 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
             <path id="envelope-path"></path>
           </svg>
           <button class="envelope-point" data-stage="attack" type="button" role="slider"
-            aria-label="attack time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
-            title="ATTACK: drag horizontally for time; vertically for curve">
-            <span class="point-mark" aria-hidden="true"></span>
-            <span class="point-label" aria-hidden="true">A</span>
-          </button>
-          <button class="envelope-point" data-stage="decay" type="button" role="slider"
-            aria-label="decay time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
-            title="DECAY: drag horizontally for time">
-            <span class="point-mark" aria-hidden="true"></span>
-            <span class="point-label" aria-hidden="true">D</span>
-          </button>
-          <button class="envelope-point" data-stage="sustain" type="button" role="slider"
-            aria-label="sustain time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
-            title="SUSTAIN: drag horizontally for time">
-            <span class="point-mark" aria-hidden="true"></span>
-            <span class="point-label" aria-hidden="true">S</span>
-          </button>
-          <button class="envelope-point" data-stage="release" type="button" role="slider"
-            aria-label="release time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
-            title="RELEASE: drag horizontally for time; vertically for curve">
-            <span class="point-mark" aria-hidden="true"></span>
-            <span class="point-label" aria-hidden="true">R</span>
-          </button>
+ aria-label="attack time" aria-valuemin="0.005" aria-valuemax="10" aria-valuenow="0.2"
+ title="ATTACK: drag horizontally for time; vertically for volume; Shift+vertical for curve">
+ <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">A</span></button>
+<button class="envelope-point" data-stage="decay" type="button" role="slider"
+ aria-label="decay time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
+ title="DECAY: drag horizontally for time">
+ <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">D</span></button>
+<button class="envelope-point" data-stage="sustain" type="button" role="slider"
+ aria-label="sustain time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
+ title="SUSTAIN: drag horizontally for time">
+ <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">S</span></button>
+<button class="envelope-point" data-stage="release" type="button" role="slider"
+ aria-label="release time" aria-valuemin="0.005" aria-valuemax="10" aria-valuenow="0.2"
+ title="RELEASE: drag horizontally for time; vertically for curve">
+ <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">R</span></button>
         </div>
+        <div class="dynamic-scale" aria-label="Volume dynamics"><span class="dynamic-mark">ppp</span><span class="dynamic-mark">pp</span><span class="dynamic-mark">p</span><span class="dynamic-mark">mf</span><span class="dynamic-mark">f</span></div>
         <output id="envelope-description" class="visually-hidden" aria-live="polite"></output>
       </section>
     </div>
@@ -161,19 +156,20 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
   <h1 id="help-title">FIELDTONE</h1>
   <p>Hold a pad or keys <b>1–6</b> to play. Release to fade out. Multiple fingers play independent voices.</p>
   <h2>Sound sets</h2><p><b>R</b> generates a set. <b>← / Space</b> goes back; <b>→ / Shift+Space</b> goes forward. History lasts until reload; generating from an older set replaces its future.</p>
-  <h2>Envelope</h2><p>Drag <b>A, D, S, R</b> horizontally to move time boundaries (0.005–5 seconds per stage). Neighbouring durations change together. S is a minimum sustain duration at 60% of peak; holding extends it.</p>
-  <p>Drag <b>A or R vertically</b>: up = logarithmic, middle = linear, down = power. Tab to a point: ← / → adjusts time (Shift for larger steps); ↑ / ↓ on A or R changes its curve.</p>
+  <h2>Crossmix</h2><p>Keep a pad pressed, drag into another pad, and stay there for 180 ms to crossfade over one second. Keep dragging to transition again; release to end the sound.</p>
+  <h2>Envelope</h2><p>Drag <b>A, D, S, R</b> horizontally to move time boundaries (minimum 0.005 seconds per stage). Durations are independent; A and R reach 10 seconds, D and S reach 5 seconds. S is a minimum sustain duration at 60% of peak; holding extends it.</p>
+  <p>Drag <b>A vertically for volume</b>. Hold <b>Shift while dragging A vertically</b>, or drag <b>R vertically</b>, for curves: up = logarithmic, middle = linear, down = power. Tab to a point: ← / → adjusts time (Shift for larger steps); ↑ / ↓ on A changes volume (Shift changes its curve); ↑ / ↓ on R changes its curve. Home / End sets a stage to its minimum / maximum.</p>
   <h2>Filter gesture</h2><p>Hold a pad and drag across the full window. <b>Vertical</b>: cutoff frequency, 40 Hz at the bottom to 16 kHz at the top. <b>Horizontal</b>: Q, 0.2 at the left to 18 at the right. Each pad keeps its settings in its sound set.</p>
   <p><b>↑ / ↓</b> changes volume in 20% steps with a 500 ms fade (default 80%). Envelope points use their own arrow controls when focused.</p>
   <p><b>I</b> opens this help; <b>Esc</b> closes it. Opening help or leaving the page releases held sounds.</p>
   <p><a href="https://github.com/HEM-Multimedia-Master/fieldtone">Source and README</a></p>
 </dialog>
 <script type="module">
-// Shared envelope mathematics: both the SVG editor and Web Audio use these curves.
 const STAGES = ['attack', 'decay', 'sustain', 'release'];
 const CURVES = ['logarithmic', 'linear', 'power'];
 const MIN_TIME = 0.005;
-const MAX_TIME = 5;
+const MAX_TIME = 10;
+const STAGE_MAX = { attack: 10, decay: 5, sustain: 5, release: 10 };
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 function curveValue(shape, position) {
@@ -193,19 +189,12 @@ function envelopeBoundaries(envelope) {
   return [0, ...STAGES.map((stage) => (time += envelope[stage]))];
 }
 
-// Move one boundary without crossing its neighbours or changing later boundaries.
+// Edit a stage duration independently; later boundaries move with it.
 function moveEnvelopePoint(envelope, stage, time) {
   const index = STAGES.indexOf(stage);
   if (index < 0 || !Number.isFinite(time)) return { ...envelope };
-  const bounds = envelopeBoundaries(envelope);
-  const previous = bounds[index];
-  const next = bounds[index + 2];
-  const min = Math.max(previous + MIN_TIME, next === undefined ? 0 : next - MAX_TIME);
-  const max = Math.min(previous + MAX_TIME, next === undefined ? Infinity : next - MIN_TIME);
-  const boundary = clamp(time, min, max);
-  const result = { ...envelope, [stage]: boundary - previous };
-  if (next !== undefined) result[STAGES[index + 1]] = next - boundary;
-  return result;
+  const previous = envelopeBoundaries(envelope)[index];
+  return { ...envelope, [stage]: clamp(time - previous, MIN_TIME, STAGE_MAX[stage]) };
 }
 
 function filterFromPosition(x, y, width, height) {
@@ -215,8 +204,7 @@ function filterFromPosition(x, y, width, height) {
 }
 
 
-// Pointer and keyboard ADSR editor.
-function setupEnvelopeEditor(root, envelope, signal) {
+function setupEnvelopeEditor(root, envelope, signal, volume) {
   const plot = root.querySelector('#envelope-plot');
   const svg = root.querySelector('#envelope-svg');
   const path = root.querySelector('#envelope-path');
@@ -228,7 +216,7 @@ function setupEnvelopeEditor(root, envelope, signal) {
   function geometry() {
     const rect = plot.getBoundingClientRect();
     const bounds = envelopeBoundaries(envelope);
-    const horizon = drag?.horizon ?? Math.max(0.1, bounds[4] * 1.2);
+    const horizon = Math.max(0.1, bounds[4] * 1.2);
     return { rect, bounds, horizon, width: Math.max(1, rect.width - 36), top: 12, bottom: Math.max(18, rect.height - 18) };
   }
 
@@ -238,7 +226,8 @@ function setupEnvelopeEditor(root, envelope, signal) {
     const x = (time) => 18 + time / horizon * width;
     const y = (level) => bottom - level * (bottom - top);
     svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-    const levels = [0, 1, 0.6, 0.6, 0];
+    const peak = volume.get() / 100;
+    const levels = [0, peak, peak * 0.6, peak * 0.6, 0];
     let d = `M ${x(0)} ${y(0)}`;
     for (let stage = 0; stage < 4; stage++) {
       const curve = stage === 0 ? envelope.attackCurve : stage === 3 ? envelope.releaseCurve : 'linear';
@@ -250,21 +239,25 @@ function setupEnvelopeEditor(root, envelope, signal) {
       }
     }
     path.setAttribute('d', d);
+    root.querySelectorAll('.dynamic-mark').forEach((mark, index) => {
+      mark.classList.toggle('current', index === Math.max(0, Math.ceil(volume.get() / 20) - 1) && volume.get() > 0);
+    });
     grid.setAttribute('d', `M 18 ${y(0)} H ${rect.width - 18} M 18 ${y(0.6)} H ${rect.width - 18} M 18 ${y(1)} H ${rect.width - 18}`);
     points.forEach((point, index) => {
       const stage = STAGES[index];
       const curve = stage === 'attack' ? envelope.attackCurve : stage === 'release' ? envelope.releaseCurve : '';
       point.style.left = `${x(bounds[index + 1])}px`;
       point.style.top = `${y(levels[index + 1])}px`;
+      point.setAttribute('aria-valuemax', STAGE_MAX[stage]);
       point.setAttribute('aria-valuenow', envelope[stage].toFixed(3));
-      point.setAttribute('aria-valuetext', `${envelope[stage].toFixed(2)} seconds${curve ? `, ${curve} curve` : ''}`);
+      point.setAttribute('aria-valuetext', `${envelope[stage].toFixed(2)} seconds${curve ? `, ${curve} curve` : ''}${stage === 'attack' ? `, volume ${Math.round(volume.get())}%` : ''}`);
       point.dataset.curve = curve;
       point.querySelector('.point-label').innerHTML = `<b>${stage[0].toUpperCase()}</b><span class="stage-time">${envelope[stage].toFixed(2)}s</span>${curve ? `<span class="curve-name">${curve === 'logarithmic' ? 'LOG' : curve === 'power' ? 'POW' : 'LIN'}</span>` : ''}`;
     });
   }
 
   function describe() {
-    description.value = STAGES.map((stage) => `${stage}: ${envelope[stage].toFixed(2)} seconds`).join(', ') + `. Attack ${envelope.attackCurve}; release ${envelope.releaseCurve}.`;
+    description.value = STAGES.map((stage) => `${stage}: ${envelope[stage].toFixed(2)} seconds`).join(', ') + `. Attack ${envelope.attackCurve}; release ${envelope.releaseCurve}; volume ${Math.round(volume.get())}%.`;
   }
 
   points.forEach((point) => {
@@ -274,14 +267,16 @@ function setupEnvelopeEditor(root, envelope, signal) {
       event.preventDefault();
       point.focus({ preventScroll: true });
       const { rect, bounds, horizon, width } = geometry();
-      drag = { pointerId: event.pointerId, stage, snapshot: { ...envelope }, x: event.clientX, y: event.clientY, rect, horizon, width, boundary: bounds[STAGES.indexOf(stage) + 1] };
+      drag = { pointerId: event.pointerId, stage, snapshot: { ...envelope }, x: event.clientX, y: event.clientY, rect, horizon, width, volume: volume.get(), curveEdit: event.shiftKey, boundary: bounds[STAGES.indexOf(stage) + 1] };
       point.setPointerCapture(event.pointerId);
     }, { signal });
     point.addEventListener('pointermove', (event) => {
       if (!drag || drag.pointerId !== event.pointerId) return;
-      const time = drag.boundary + (event.clientX - drag.x) / drag.width * drag.horizon;
+      const time = drag.boundary + (event.clientX - drag.x) / (drag.width * 0.35) * STAGE_MAX[stage];
       Object.assign(envelope, moveEnvelopePoint(drag.snapshot, stage, time));
-      if (stage === 'attack' || stage === 'release') {
+      if (stage === 'attack' && !drag.curveEdit) {
+        volume.set(clamp(drag.volume - (event.clientY - drag.y) / Math.max(1, drag.rect.height - 30) * 100, 0, 100));
+      } else if (stage === 'attack' || stage === 'release') {
         const key = `${stage}Curve`;
         const offset = Math.round((event.clientY - drag.y) / Math.max(14, drag.rect.height * 0.25));
         const index = clamp(CURVES.indexOf(drag.snapshot[key]) + offset, 0, CURVES.length - 1);
@@ -300,13 +295,18 @@ function setupEnvelopeEditor(root, envelope, signal) {
     point.addEventListener('pointercancel', finish, { signal });
     point.addEventListener('lostpointercapture', finish, { signal });
     point.addEventListener('keydown', (event) => {
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       event.stopPropagation();
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (event.key === 'Home' || event.key === 'End') {
+        const previous = envelopeBoundaries(envelope)[STAGES.indexOf(stage)];
+        Object.assign(envelope, moveEnvelopePoint(envelope, stage, previous + (event.key === 'End' ? STAGE_MAX[stage] : 0.005)));
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         const boundary = envelopeBoundaries(envelope)[STAGES.indexOf(stage) + 1];
         const step = event.shiftKey ? 0.1 : 0.01;
         Object.assign(envelope, moveEnvelopePoint(envelope, stage, boundary + (event.key === 'ArrowRight' ? step : -step)));
+      } else if (stage === 'attack' && !event.shiftKey) {
+        volume.set(clamp(volume.get() + (event.key === 'ArrowUp' ? 20 : -20), 0, 100));
       } else if (stage === 'attack' || stage === 'release') {
         const key = `${stage}Curve`;
         const index = clamp(CURVES.indexOf(envelope[key]) + (event.key === 'ArrowDown' ? 1 : -1), 0, CURVES.length - 1);
@@ -319,12 +319,12 @@ function setupEnvelopeEditor(root, envelope, signal) {
   const observer = new ResizeObserver(render);
   observer.observe(plot);
   signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+  root.addEventListener('fieldtone:volume', render, { signal });
   render();
   describe();
 }
 
 
-// Sound-set state, pad gestures, synthesis, and lifecycle.
 function initFieldtone() {
   "use strict";
   const root = document.getElementById('fieldtone-container');
@@ -372,12 +372,13 @@ function initFieldtone() {
     return startValue + (targetValue - startValue) * progress;
   }
 
-  function setMasterVolume(value, smooth = false) {
+  function setMasterVolume(value, smooth = false, notify = true) {
     const target = Math.max(0, Math.min(100, value));
     const now = state.audio?.currentTime ?? 0;
     const start = state.audio ? currentMasterLevel(now) : target;
     state.masterLevel = target;
-    announce(`VOLUME ${Math.round(target)}%`);
+    root.dispatchEvent(new Event('fieldtone:volume'));
+    if (smooth && notify) announce(`VOLUME ${Math.round(target)}%`);
 
     if (state.master && state.audio) {
       state.master.gain.cancelScheduledValues(now);
@@ -401,11 +402,11 @@ function initFieldtone() {
     timers.add(id);
     return id;
   }
-  setupEnvelopeEditor(root, envelopeSettings, signal);
+  setupEnvelopeEditor(root, envelopeSettings, signal, { get: () => state.masterLevel, set: (value) => setMasterVolume(value, true, false) });
 
-  function beginGate(index, key, origin = null) {
+  function beginGate(index, key, origin = null, transitionSource = null) {
     if (gates.has(key)) return;
-    const gate = { index, pad: state.pads[index], released: false, cancelled: false, voice: null, origin, dragged: false };
+    const gate = { transitionSource, index, pad: state.pads[index], released: false, cancelled: false, voice: null, origin, dragged: false };
     gates.set(key, gate);
     void play(index, gate);
     return gate;
@@ -425,6 +426,29 @@ function initFieldtone() {
     for (const voice of activeVoices) voice.release(true);
     crosshair.hidden = true;
   }
+  function padAt(x, y) {
+    const button = document.elementFromPoint(x, y)?.closest('.pad');
+    return button && padGrid.contains(button) ? Number(button.dataset.pad) : -1;
+  }
+  function considerTransition(gate, key, event) {
+    const index = padAt(event.clientX, event.clientY);
+    gate.position = { x: event.clientX, y: event.clientY };
+    if (gate.hoverIndex === index) return;
+    gate.hoverIndex = index;
+    if (gate.hoverTimer) { clearTimeout(gate.hoverTimer); timers.delete(gate.hoverTimer); }
+    if (index < 0 || index === gate.index) return;
+    // Briefly dwelling avoids changing sounds when crossing a pad on the way elsewhere.
+    gate.hoverTimer = later(() => {
+      if (gates.get(key) !== gate || gate.released || gate.hoverIndex !== index) return;
+      Object.assign(state.pads[index], filterFromPosition(gate.position.x, gate.position.y, innerWidth, innerHeight));
+      gates.delete(key);
+      const destination = beginGate(index, key, gate.origin, gate);
+      destination.dragged = true;
+      destination.hoverIndex = index;
+      padGrid.querySelector(`[data-pad="${index}"] .filter-readout`).textContent = `F ${Math.round(destination.pad.cutoff)}Hz · Q ${destination.pad.resonance.toFixed(1)}`;
+    }, 180);
+  }
+
   function bindPadGesture(button, index) {
     button.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
@@ -438,6 +462,7 @@ function initFieldtone() {
       if (!gate) return;
       if (!gate.dragged && Math.hypot(event.clientX - gate.origin.x, event.clientY - gate.origin.y) < 3) return;
       gate.dragged = true;
+      considerTransition(gate, `pointer:${event.pointerId}`, event);
       const filter = filterFromPosition(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
       Object.assign(gate.pad, filter);
       for (const voice of activeVoices) {
@@ -446,7 +471,7 @@ function initFieldtone() {
         voice.filter.frequency.setTargetAtTime(Math.min(filter.cutoff, state.audio.sampleRate * 0.45), now, 0.015);
         voice.filter.Q.setTargetAtTime(filter.resonance, now, 0.015);
       }
-      button.querySelector('.filter-readout').textContent = `F ${Math.round(filter.cutoff)}Hz · Q ${filter.resonance.toFixed(1)}`;
+      padGrid.querySelector(`[data-pad="${gate.index}"] .filter-readout`).textContent = `F ${Math.round(filter.cutoff)}Hz · Q ${filter.resonance.toFixed(1)}`;
       crosshair.hidden = false;
       crosshair.classList.toggle('at-right', event.clientX > innerWidth - 160);
       crosshair.classList.toggle('at-bottom', event.clientY > innerHeight - 50);
@@ -717,7 +742,7 @@ function initFieldtone() {
       const settings = { ...envelopeSettings };
       const attack = settings.attack;
       const release = settings.release;
-      const attackDuration = settings.attack;
+      const attackDuration = gate.transitionSource ? 0.005 : settings.attack;
       const decayDuration = settings.decay;
       const releaseDuration = settings.release;
       const decayEnd = now + attackDuration + decayDuration;
@@ -808,7 +833,12 @@ function initFieldtone() {
       gestureFilter.frequency.value = Math.min(pad.cutoff, context.sampleRate * 0.45);
       gestureFilter.Q.value = pad.resonance;
       envelope.connect(gestureFilter);
-      gestureFilter.connect(panner);
+      const mix = context.createGain();
+      const transition = gate.transitionSource;
+      const mixSeconds = 1;
+      mix.gain.value = transition ? 0 : 1;
+      gestureFilter.connect(mix);
+      mix.connect(panner);
       panner.connect(dry);
       dry.connect(state.buses[index]);
       panner.connect(delaySend);
@@ -839,11 +869,23 @@ function initFieldtone() {
         if (cleaned) return;
         cleaned = true;
         activeVoices.delete(voice);
-        for (const node of [envelope, gestureFilter, panner, dry, delaySend, delay, delayFeedback, delayReturn, reverbSend]) node.disconnect();
+        for (const node of [envelope, gestureFilter, mix, panner, dry, delaySend, delay, delayFeedback, delayReturn, reverbSend]) node.disconnect();
         if (![...activeVoices].some((other) => other.button === padButton)) padButton.classList.remove('is-playing');
       };
       const voice = {
         pad, button: padButton, filter: gestureFilter, cleanup,
+        fadeOut(seconds) {
+          if (cleaned || released) return;
+          released = true;
+          const time = context.currentTime;
+          const startMix = transition ? Math.sin(clamp((time - now) / mixSeconds, 0, 1) * Math.PI / 2) : 1;
+          mix.gain.cancelScheduledValues(0);
+          const samples = Float32Array.from({ length: 96 }, (_, i) => startMix * Math.cos(i / 95 * Math.PI / 2));
+          samples[samples.length - 1] = 0;
+          mix.gain.setValueCurveAtTime(samples, time, seconds);
+          for (const oscillator of voices) oscillator.stop(time + seconds + 0.03);
+          later(cleanup, (seconds + 2.3) * 1000);
+        },
         release(immediate = false) {
           if (cleaned || (released && !immediate)) return;
           const time = context.currentTime;
@@ -866,8 +908,15 @@ function initFieldtone() {
       activeVoices.add(voice);
       for (const oscillator of voices) oscillator.start(now);
       gate.voice = voice;
+      if (transition) {
+        const samples = Float32Array.from({ length: 96 }, (_, i) => Math.sin(i / 95 * Math.PI / 2));
+        mix.gain.setValueCurveAtTime(samples, now, mixSeconds);
+        transition.cancelled = true;
+        transition.voice?.fadeOut(mixSeconds);
+      }
       if (gate.released) voice.release();
     } catch (error) {
+      gate.transitionSource?.voice?.release(true);
       announce(error instanceof Error ? error.message : "Unable to start audio.");
     }
   }
@@ -923,6 +972,7 @@ function initFieldtone() {
   window.addEventListener('pagehide', (event) => {
     releaseAll();
     if (event.persisted) return;
+    releaseAll();
     for (const voice of [...activeVoices]) voice.cleanup();
     controller.abort();
     for (const timer of timers) clearTimeout(timer);

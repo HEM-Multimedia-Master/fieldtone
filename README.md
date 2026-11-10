@@ -21,8 +21,8 @@ screens use three columns of two.
 
 ### Sound sets
 
-The green-bordered **R** button generates a new set of voices, pitches,
-effects, stereo positions, and signal connections. **< / >** restore earlier
+The square, green-bordered **R** button generates a new set of voices, pitches,
+effects and stereo positions. FM cables are created only by the player, never randomly. **< / >** restore earlier
 or later sets; **SET n / total** shows the position. Controls are available on
 both touch devices and desktop.
 
@@ -46,6 +46,19 @@ sine/cosine gain curves. Briefly passing through a pad does not switch voices.
 Continue dragging to transition again; release the pointer or finger to end
 the current voice through its release envelope. Nothing stays latched after
 release. Each simultaneous touch has its own transition state.
+
+### Manual FM cables
+
+New sets always start **without cables**. Each pad has an **OUT** terminal on the right and an **FM IN** terminal on the left. Drag a free OUT circle to a free FM IN circle to make a connection. The source sound modulates the frequency of the destination's carrier oscillators; play or hold both pads to hear the interaction. This does not mix a copy into the destination's audio output. The FM voice also retains its own internal modulator/carrier synthesis.
+
+Connections use a gentle, frequency-relative depth (25% before the bounded modulation signal). Every endpoint is an outlined circle with its own touch target:
+
+- Drag a connected **FM IN** endpoint to another inlet to change its carrier pad.
+- Drag a connected **OUT** endpoint to another output to change its modulator pad.
+- Drop a connected endpoint on a pad's **body/centre** to delete that cable. Dropping outside the pads or cancelling leaves it unchanged.
+- For keyboard control, Tab to a terminal, press **Enter**, then focus the compatible terminal and press **Enter** again. **Delete / Backspace** removes its cable; **Esc** cancels selection.
+
+Connections are stored with their set and can be edited while notes sound. Duplicate cables, self-connections, and direct feedback cycles are rejected. Filters, crossmix and other fingers remain playable while another finger edits a cable.
 
 ### Envelope
 
@@ -168,7 +181,10 @@ The inline module is organized into math helpers, the envelope editor, and
 - `beginGate()` / `endGate()` pair pointer or keyboard presses with releases.
 - Pointer capture keeps a gesture attached to its original pad across the window.
 - `ensureAudio()` lazily initializes Web Audio after a playing gesture.
-- `graphFor()` retains separate bus/reverb/routing nodes for each sounding set.
+- `graphFor()` retains separate audio/effects and FM modulation nodes for each sounding set.
+- `createFmRouter()` attaches manual FM links to each live carrier frequency and cleans them up with the voice.
+- `setupPatching()` provides pointer/touch and keyboard cable creation, reconnection, and deletion.
+- `connectFm()` validates manual graphs without duplicates, self-connections, or feedback cycles.
 - `disposeUnusedGraphs()` frees retired routing only after its last voice and tail finish.
 - `releaseAll()` handles focus changes and dialogs safely; set changes preserve active voices.
 
@@ -186,8 +202,12 @@ and decays to 0.33 (60%). Its release ends at zero.
 
 Oscillators and synthesis filters feed an envelope gain, then a per-voice
 low-pass gesture filter and stereo panner. Dry, delay, and reverb signals feed
-pad buses. Randomized, quieter links connect buses in a directed signal graph;
-the SVG cables visualize those connections. The master gain and compressor
+pad buses, each feeding the master directly. Manual cables connect a separate,
+bounded modulation signal (after the source voice's envelope/filter/crossfade,
+before stereo and effects) through a depth gain to the destination carrier's
+`OscillatorNode.frequency` AudioParam. This is audio-rate FM; no cable copies
+audio between pad output buses. Internal FM/ring modulators are not treated
+as external carrier targets. The SVG cables visualize the manual FM graph. The master gain and compressor
 feed the speakers. Automatic pan moves from the generated position toward its
 opposite over attack plus release time.
 
@@ -211,7 +231,7 @@ These principles describe the current instrument and its remaining limitations:
 5. **Control:** Audio requires a playing gesture. Release, cancellation,
    focus loss, and opening help end held notes. There is no microphone input
    and no dedicated global stop button yet.
-6. **Decision:** Code randomizes patches; players choose sets, notes, timings,
+6. **Decision:** Code randomizes voices and their parameters; players configure all FM cables; players choose sets, notes, timings,
    curves, filters, and volume. No learned behavior is used.
 7. **Trace:** Sets and their filter settings can be revisited during a session.
    Recording, export, seeded reproduction, and history persistence are not implemented.
@@ -222,8 +242,9 @@ These principles describe the current instrument and its remaining limitations:
 
 When changing the instrument, check:
 
+- Manual OUT → FM IN connections, reconnection of either endpoint, body-drop deletion, cancellation, keyboard edits, and refusal of duplicate/feedback cables. Confirm that R starts with no cables and history restores manual links.
 - Desktop, portrait phone, tablet, and short landscape layouts: six pads,
-  full viewport width, a 15% bottom panel, and reachable envelope points.
+  full viewport width, a 15% bottom panel, square R / < / > buttons, and reachable envelope points/patch terminals.
 - Hold a key or touch while generating with R; overlap old/new voices, verify a 10-second release survives set changes, and release the original input after its pad disappears.
 - R and previous/next navigation, disabled history boundaries, and branching
   history when generating from an earlier set.

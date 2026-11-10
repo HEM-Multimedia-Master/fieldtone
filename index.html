@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#08090a">
-<meta name="description" content="Six generative synthesizer pads with a draggable ADSR envelope and independent pad-local touch filters.">
+<meta name="description" content="Six generative synthesizer pads with a draggable ADSR envelope and manual FM patching and independent pad-local touch filters.">
 <title>FIELDTONE</title>
 <style>
+
   #fieldtone-container {
     --bg: #08090a;
     --line: #343a39;
@@ -34,7 +35,14 @@
   #fieldtone-container .instrument-stage { position: relative; width: 100%; max-width: none; min-width: 0; height: 100%; min-height: 0; background: transparent; border: 0; margin: 0; padding: 0; isolation: isolate; }
   #fieldtone-container .patch-wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
   #fieldtone-container .wire { fill: none; stroke: var(--cyan); stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 5; }
-  #fieldtone-container .wire-dot { fill: var(--cyan); }
+  #fieldtone-container #patch-ports { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+  #fieldtone-container .patch-port { position: absolute; width: var(--port-size); height: var(--port-size); padding: 0; margin: 0; border: 0; display: grid; place-items: center; transform: translate(-50%, -50%); touch-action: none; pointer-events: auto; color: var(--cyan); }
+  #fieldtone-container .port-ring { width: 10px; height: 10px; border: 1px solid currentColor; border-radius: 50%; background: transparent; pointer-events: none; }
+  #fieldtone-container .patch-port.connected .port-ring { border-width: 2px; }
+  #fieldtone-container .patch-port.selected { outline: 1px dashed var(--lime); }
+  #fieldtone-container .port-label { position: absolute; top: calc(50% + 8px); font-size: 7px; pointer-events: none; }
+  #fieldtone-container .wire.editing { opacity: .2; }
+  #fieldtone-container .wire.preview { stroke-opacity: 1; stroke-dasharray: none; }
   #fieldtone-container .pad-grid { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); width: 100%; height: 100%; gap: 0; z-index: 3; }
   #fieldtone-container .pad { position: relative; overflow: hidden; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; touch-action: none; user-select: none; }
   #fieldtone-container .pad:nth-child(3n) { border-right: 0; }
@@ -44,7 +52,6 @@
   #fieldtone-container .wave-wrap { position: absolute; inset: 0; pointer-events: none; }
   #fieldtone-container .waveform { width: 100%; height: 100%; color: var(--pad-accent); opacity: .55; transition: opacity .12s; }
   #fieldtone-container .wave-line { fill: none; stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
-  #fieldtone-container .wave-dots { fill: currentColor; }
   #fieldtone-container .pad-readout { position: absolute; z-index: 4; inset: auto 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; font: 8px/1.2 var(--mono); pointer-events: none; }
   #fieldtone-container .pad-readout strong { font-weight: 400; }
   #fieldtone-container .pad-readout i { font-style: normal; }
@@ -52,7 +59,7 @@
   #fieldtone-container .filter-readout { color: var(--cyan); }
   #fieldtone-container .bottom-panel { display: grid; grid-template-columns: clamp(86px, 18vw, 180px) minmax(0, 1fr); min-height: 0; border-top: 1px solid var(--line); }
   #fieldtone-container .set-controls { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: minmax(0, 1fr) 20px; min-height: 0; border-right: 1px solid var(--line); }
-  #fieldtone-container .set-controls button { min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--line); font-size: clamp(13px, 2vw, 22px); touch-action: manipulation; }
+  #fieldtone-container .set-controls button { width: min(100%, max(0px, calc(15dvh - 20px))); height: auto; aspect-ratio: 1; align-self: center; justify-self: center; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 1px solid var(--line); font-size: clamp(13px, 2vw, 22px); touch-action: manipulation; }
   #fieldtone-container #reroll-button { border: 1px solid var(--lime); color: var(--lime); }
   #fieldtone-container .set-controls button:disabled { opacity: .25; cursor: default; }
   #fieldtone-container #history-position { grid-column: 1 / -1; display: grid; place-items: center; font-size: clamp(8px, 1vw, 10px); letter-spacing: .08em; }
@@ -78,7 +85,7 @@
   #fieldtone-container #notice { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); max-width: 90%; margin: 0; color: var(--lime); background: var(--bg); font: 10px var(--mono); opacity: 0; pointer-events: none; z-index: 12; }
   #fieldtone-container #notice.visible { opacity: 1; }
   #fieldtone-container .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  /* Keep help above the set navigation. */
+  /* Keep the shared information tap target out of the set navigation. */
   #fieldtone-container ~ #info-corner { bottom: 15dvh; }
   @media (max-width: 650px) {
     #fieldtone-container .pad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
@@ -94,7 +101,6 @@
     #fieldtone-container .envelope-point[data-stage="release"] .point-label { top: 0; }
   }
   @media (prefers-reduced-motion: reduce) { #fieldtone-container * { transition: none !important; } }
-
 html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscroll-behavior: none; }
 #info-corner { position: fixed; left: 0; bottom: 15dvh; width: 44px; height: 44px; border: 0; background: transparent; color: #b6bfba; font: 24px monospace; cursor: pointer; z-index: 15; }
 #hero-modal { box-sizing: border-box; max-width: min(640px, 94vw); max-height: 90dvh; padding: 24px; border: 1px solid #343a39; background: #08090a; color: #b6bfba; font: 14px/1.6 monospace; }
@@ -111,6 +117,7 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
     <main class="instrument-stage" aria-label="Six synthesizer pads. Hold and drag inside each pad: vertical frequency, horizontal Q. Multiple touches have independent filters.">
       <svg id="patch-wires" class="patch-wires" aria-hidden="true"></svg>
       <div id="pad-grid" class="pad-grid"></div>
+      <div id="patch-ports" aria-label="Manual FM connections"></div>
     </main>
     <div class="bottom-panel">
       <nav class="set-controls" aria-label="Sound sets">
@@ -125,22 +132,10 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
             <path class="envelope-grid" id="envelope-grid"></path>
             <path id="envelope-path"></path>
           </svg>
-          <button class="envelope-point" data-stage="attack" type="button" role="slider"
- aria-label="attack time" aria-valuemin="0.005" aria-valuemax="10" aria-valuenow="0.2"
- title="ATTACK: drag horizontally for time; vertically for volume; Shift+vertical for curve">
- <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">A</span></button>
-<button class="envelope-point" data-stage="decay" type="button" role="slider"
- aria-label="decay time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
- title="DECAY: drag horizontally for time">
- <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">D</span></button>
-<button class="envelope-point" data-stage="sustain" type="button" role="slider"
- aria-label="sustain time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2"
- title="SUSTAIN: drag horizontally for time">
- <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">S</span></button>
-<button class="envelope-point" data-stage="release" type="button" role="slider"
- aria-label="release time" aria-valuemin="0.005" aria-valuemax="10" aria-valuenow="0.2"
- title="RELEASE: drag horizontally for time; vertically for curve">
- <span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">R</span></button>
+          <button class="envelope-point" data-stage="attack" type="button" role="slider" aria-label="attack time" aria-valuemin="0.005" aria-valuemax="10" aria-valuenow="0.2" title="ATTACK: drag horizontally for time; vertically for volume; Shift+vertical for curve"><span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">A</span></button>
+<button class="envelope-point" data-stage="decay" type="button" role="slider" aria-label="decay time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2" title="DECAY: drag horizontally for time"><span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">D</span></button>
+<button class="envelope-point" data-stage="sustain" type="button" role="slider" aria-label="sustain time" aria-valuemin="0.005" aria-valuemax="5" aria-valuenow="0.2" title="SUSTAIN: drag horizontally for time"><span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">S</span></button>
+<button class="envelope-point" data-stage="release" type="button" role="slider" aria-label="release time" aria-valuemin="0.005" aria-valuemax="10" aria-valuenow="0.2" title="RELEASE: drag horizontally for time; vertically for curve"><span class="point-mark" aria-hidden="true"></span><span class="point-label" aria-hidden="true">R</span></button>
         </div>
         <div class="dynamic-scale" aria-label="Volume dynamics"><span class="dynamic-mark">ppp</span><span class="dynamic-mark">pp</span><span class="dynamic-mark">p</span><span class="dynamic-mark">mf</span><span class="dynamic-mark">f</span></div>
         <output id="envelope-description" class="visually-hidden" aria-live="polite"></output>
@@ -157,6 +152,7 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
   <p>Hold a pad or keys <b>1–6</b> to play. Release to fade out. Multiple fingers play independent voices.</p>
   <h2>Sound sets</h2><p><b>R</b> generates a set. <b>← / Space</b> goes back; <b>→ / Shift+Space</b> goes forward. Existing voices and their effects keep sounding when you change sets. History lasts until reload; generating from an older set replaces its future.</p>
   <h2>Crossmix</h2><p>Keep a pad pressed, drag into another pad, and stay there for 180 ms to crossfade over one second. Keep dragging to transition again; release to end the sound.</p>
+  <h2>Manual FM cables</h2><p>New sets have no cables. Drag a free <b>OUT</b> circle to a free <b>FM IN</b> circle, then hold both sounds: the source modulates the destination's carrier frequency at a gentle depth. Connected endpoints can be dragged to another terminal of the same type. Drop on a pad body to delete; drop outside or cancel to keep the cable. Duplicate and feedback connections are rejected.</p><p>Keyboard: focus a terminal, Enter, focus its compatible terminal, Enter. Delete / Backspace removes a cable; Esc cancels. Connections stay with their set. The FM synth also retains its own internal modulation.</p>
   <h2>Envelope</h2><p>Drag <b>A, D, S, R</b> horizontally to move time boundaries (minimum 0.005 seconds per stage). Durations are independent; A and R reach 10 seconds, D and S reach 5 seconds. S is a minimum sustain duration at 60% of peak; holding extends it.</p>
   <p>Drag <b>A vertically for volume</b>. Hold <b>Shift while dragging A vertically</b>, or drag <b>R vertically</b>, for curves: up = logarithmic, middle = linear, down = power. Tab to a point: ← / → adjusts time (Shift for larger steps); ↑ / ↓ on A changes volume (Shift changes its curve); ↑ / ↓ on R changes its curve. Home / End sets a stage to its minimum / maximum.</p>
   <h2>Filter gesture</h2><p>Hold a pad and drag within its square. Each pad maps the full filter range locally. Each finger has an independent numbered, coloured cursor, including two or three fingers on the same pad. Crossfade transfers each cursor to the destination pad. <b>Vertical</b>: cutoff frequency, 40 Hz at the bottom of the pad to 16 kHz at its top. <b>Horizontal</b>: Q, 0.2 at the left edge of the pad to 18 at its right edge. Each pad keeps its settings in its sound set.</p>
@@ -164,7 +160,9 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
   <p><b>I</b> opens this help; <b>Esc</b> closes it. Opening help or leaving the page releases held sounds.</p>
   <p><a href="https://github.com/HEM-Multimedia-Master/fieldtone">Source and README</a></p>
 </dialog>
+
 <script type="module">
+// lib/fieldtone-controls.js
 const STAGES = ['attack', 'decay', 'sustain', 'release'];
 const CURVES = ['logarithmic', 'linear', 'power'];
 const MIN_TIME = 0.005;
@@ -208,7 +206,225 @@ function filterFromPad(x, y, rect) {
   return filterFromPosition(x - rect.left, y - rect.top, rect.width, rect.height);
 }
 
-// Pointer and keyboard ADSR editor.
+// lib/fieldtone-fm.js
+// Manual FM graphs must stay acyclic: zero-delay feedback can mute a Web Audio graph.
+function connectFm(links, from, to, replace = -1, count = 6) {
+  if (![from, to].every((n) => Number.isInteger(n) && n >= 0 && n < count)) return { error: 'Invalid FM terminal.' };
+  const next = links.filter((_, index) => index !== replace).map((edge) => [...edge]);
+  if (from === to) return { error: 'Connect two different pads.' };
+  if (next.some(([a, b]) => a === from && b === to)) return { error: 'That FM cable already exists.' };
+  const visit = (node, seen = new Set()) => {
+    if (node === from) return true;
+    if (seen.has(node)) return false;
+    seen.add(node);
+    return next.some(([a, b]) => a === node && visit(b, seen));
+  };
+  if (visit(to)) return { error: 'FM feedback loops are not supported.' };
+  next.splice(replace < 0 ? next.length : replace, 0, [from, to]);
+  return { links: next };
+}
+
+// Each live carrier gets its own AudioParam connection; nothing feeds the target's audio bus.
+function createFmRouter(context, sources, later) {
+  const voices = new Map();
+  let links = [];
+  let disposed = false;
+  function unplug(route) {
+    if (route.disconnected) return;
+    route.disconnected = true;
+    sources[route.from].disconnect(route.gain);
+    route.gain.disconnect();
+  }
+  function sync(nextLinks) {
+    links = nextLinks.map((edge) => [...edge]);
+    for (const [voice, entry] of voices) {
+      const wanted = links.filter(([, to]) => to === entry.index).map(([from]) => from);
+      let removed = false;
+      for (const [from, routes] of entry.routes) {
+        if (wanted.includes(from)) continue;
+        removed = true;
+        entry.routes.delete(from);
+        for (const route of routes) {
+          route.gain.gain.setTargetAtTime(0, context.currentTime, 0.01);
+          entry.retiring.add(route);
+          later(() => { unplug(route); entry.retiring.delete(route); }, 60);
+        }
+      }
+      const connect = () => {
+        if (disposed || !voices.has(voice)) return;
+        if (entry.retiring.size) { later(connect, 65); return; }
+        for (const [from, to] of links) {
+          if (to !== entry.index || entry.routes.has(from)) continue;
+          const routes = entry.carriers.map((carrier) => {
+            const gain = context.createGain();
+            gain.gain.value = 0;
+            // A conservative frequency-relative depth retains the underlying timbre.
+            gain.gain.setTargetAtTime(Math.abs(carrier.frequency.value) * 0.25, context.currentTime, 0.01);
+            sources[from].connect(gain);
+            gain.connect(carrier.frequency);
+            return { from, gain, disconnected: false };
+          });
+          entry.routes.set(from, routes);
+        }
+      };
+      // Let removed routes disconnect before adding a potentially reversed edge.
+      if (removed || entry.retiring.size) later(connect, 65); else connect();
+    }
+  }
+  function removeVoice(voice) {
+    const entry = voices.get(voice);
+    if (!entry) return;
+    for (const routes of entry.routes.values()) for (const route of routes) unplug(route);
+    for (const route of entry.retiring) unplug(route);
+    voices.delete(voice);
+  }
+  return {
+    sync,
+    addVoice(voice, index, carriers) {
+      voices.set(voice, { index, carriers, routes: new Map(), retiring: new Set() });
+      sync(links);
+    },
+    removeVoice,
+    dispose() { disposed = true; for (const voice of [...voices.keys()]) removeVoice(voice); },
+  };
+}
+
+// scripts/fieldtone-patching.js
+
+function setupPatching(root, state, change, announce, signal) {
+  const stage = root.querySelector('.instrument-stage');
+  const grid = root.querySelector('#pad-grid');
+  const svg = root.querySelector('#patch-wires');
+  const ports = root.querySelector('#patch-ports');
+  let drag = null;
+  let selected = null;
+  let terminals = [];
+  const endpoint = (element) => ({ pad: Number(element.dataset.pad), end: element.dataset.end, link: Number(element.dataset.link), x: Number(element.dataset.x), y: Number(element.dataset.y) });
+  const path = (a, b) => {
+    const bend = Math.max(24, Math.abs(b.x - a.x) * 0.45);
+    return `M ${a.x} ${a.y} C ${a.x + bend} ${a.y}, ${b.x - bend} ${b.y}, ${b.x} ${b.y}`;
+  };
+  function paint() {
+    const { links } = state();
+    svg.innerHTML = links.map(([from, to], index) => {
+      const a = terminals.find((t) => t.link === index && t.end === 'from');
+      const b = terminals.find((t) => t.link === index && t.end === 'to');
+      return `<path class="wire${drag?.start.link === index ? ' editing' : ''}" data-link="${index}" d="${path(a, b)}"><title>FM ${from + 1} → ${to + 1}</title></path>`;
+    }).join('');
+    if (drag) {
+      const old = links[drag.start.link];
+      const fixed = old ? terminals.find((t) => t.link === drag.start.link && t.end !== drag.start.end) : drag.start;
+      const a = drag.start.end === 'to' ? fixed : drag.point;
+      const b = drag.start.end === 'to' ? drag.point : fixed;
+      // New OUT cables point toward the pointer; moving an OUT keeps the inlet fixed.
+      const start = old ? a : drag.start.end === 'from' ? fixed : drag.point;
+      const end = old ? b : drag.start.end === 'from' ? drag.point : fixed;
+      svg.innerHTML += `<path class="wire preview" d="${path(start, end)}"></path>`;
+    }
+  }
+  function render() {
+    drag = null;
+    selected = null;
+    const bounds = stage.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    svg.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+    const { links, pads } = state();
+    terminals = [];
+    pads.forEach((_, pad) => {
+      const rect = grid.querySelector(`[data-pad="${pad}"]`).getBoundingClientRect();
+      for (const end of ['to', 'from']) {
+        const connected = links.flatMap((edge, link) => edge[end === 'from' ? 0 : 1] === pad ? [link] : []);
+        const slots = [...connected, -1];
+        const size = Math.min(36, (rect.height - 16) / slots.length);
+        slots.forEach((link, index) => terminals.push({ pad, end, link, size, x: rect.left - bounds.left + (end === 'to' ? 18 : rect.width - 18), y: rect.top - bounds.top + rect.height / 2 + (index - (slots.length - 1) / 2) * size }));
+      }
+    });
+    ports.innerHTML = terminals.map((t) => {
+      const edge = links[t.link];
+      const name = `${t.end === 'from' ? 'OUT' : 'FM IN'} ${t.pad + 1}`;
+      const action = edge ? `cable ${edge[0] + 1} to ${edge[1] + 1}: drag to reconnect, drop on a pad body to disconnect` : 'drag to a compatible terminal to connect';
+      return `<button type="button" class="patch-port${edge ? ' connected' : ''}" data-pad="${t.pad}" data-end="${t.end}" data-link="${t.link}" data-x="${t.x}" data-y="${t.y}" style="left:${t.x}px;top:${t.y}px;--port-size:${t.size}px" aria-label="${name}, ${action}" title="${name}: ${action}"><span class="port-ring" aria-hidden="true"></span>${t.link === -1 ? `<span class="port-label" aria-hidden="true">${t.end === 'from' ? 'OUT' : 'FM'}</span>` : ''}</button>`;
+    }).join('');
+    paint();
+  }
+  function apply(start, target, body) {
+    const { links } = state();
+    if (!target) {
+      if (body && start.link >= 0) { change(links.filter((_, index) => index !== start.link)); announce('FM cable disconnected.'); }
+      render(); return;
+    }
+    const edge = links[start.link];
+    // Existing cables reconnect one endpoint to a port of the same type.
+    if (target.end !== (edge ? start.end : start.end === 'from' ? 'to' : 'from')) {
+      announce('Connect OUT to FM IN.'); render(); return;
+    }
+    const from = edge ? start.end === 'from' ? target.pad : edge[0] : start.end === 'from' ? start.pad : target.pad;
+    const to = edge ? start.end === 'to' ? target.pad : edge[1] : start.end === 'to' ? start.pad : target.pad;
+    const result = connectFm(links, from, to, start.link);
+    if (result.error) announce(result.error);
+    else { change(result.links); announce(`FM ${from + 1} → ${to + 1}`); }
+    render();
+  }
+  ports.addEventListener('pointerdown', (event) => {
+    const button = event.target.closest('.patch-port');
+    if (!button || event.button !== 0 || drag) return;
+    event.preventDefault(); event.stopPropagation();
+    selected = null;
+    const start = endpoint(button);
+    drag = { id: event.pointerId, start, point: { x: start.x, y: start.y } };
+    ports.setPointerCapture(event.pointerId);
+    paint();
+  }, { signal });
+  ports.addEventListener('pointermove', (event) => {
+    if (drag?.id !== event.pointerId) return;
+    const rect = stage.getBoundingClientRect();
+    drag.point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    paint();
+  }, { signal });
+  ports.addEventListener('pointerup', (event) => {
+    if (drag?.id !== event.pointerId) return;
+    const start = drag.start;
+    drag = null;
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    const target = hit?.closest('.patch-port');
+    apply(start, target ? endpoint(target) : null, grid.contains(hit));
+    if (ports.hasPointerCapture(event.pointerId)) ports.releasePointerCapture(event.pointerId);
+  }, { signal });
+  const cancel = (event) => {
+    if (drag?.id !== event.pointerId) return;
+    drag = null; paint();
+  };
+  ports.addEventListener('pointercancel', cancel, { signal });
+  ports.addEventListener('lostpointercapture', cancel, { signal });
+  ports.addEventListener('keydown', (event) => {
+    const button = event.target.closest('.patch-port');
+    if (!button || !['Enter', ' ', 'Escape', 'Delete', 'Backspace'].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const start = endpoint(button);
+    if (event.key === 'Escape') { render(); return; }
+    if (event.key === 'Delete' || event.key === 'Backspace') { apply(start, null, true); return; }
+    if (selected) { const previous = selected; selected = null; apply(previous, start, false); }
+    else { selected = start; button.classList.add('selected'); announce('Select the other FM terminal, or Delete to disconnect.'); }
+  }, { signal });
+  ports.addEventListener('click', (event) => {
+    const button = event.target.closest('.patch-port');
+    if (event.detail !== 0 || !button) return;
+    const terminal = endpoint(button);
+    if (selected) { const previous = selected; selected = null; apply(previous, terminal, false); }
+    else { selected = terminal; button.classList.add('selected'); announce('Select the other FM terminal.'); }
+  }, { signal });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || (!drag && !selected) || document.querySelector('dialog[open]')) return;
+    event.preventDefault(); event.stopPropagation();
+    const id = drag?.id;
+    render();
+    if (id !== undefined && ports.hasPointerCapture(id)) ports.releasePointerCapture(id);
+  }, { capture: true, signal });
+  return { render, cancel: () => render() };
+}
+
+// scripts/fieldtone-envelope.js
+
 function setupEnvelopeEditor(root, envelope, signal, volume) {
   const plot = root.querySelector('#envelope-plot');
   const svg = root.querySelector('#envelope-svg');
@@ -329,7 +545,11 @@ function setupEnvelopeEditor(root, envelope, signal, volume) {
   describe();
 }
 
+// scripts/fieldtone.js
 
+// Adapted from HEM-Multimedia-Master/fieldtone, index.html.
+// Source commit: 061ab66664fdd80946135289427ccf6d974b152b (2026-10-16).
+// https://github.com/HEM-Multimedia-Master/fieldtone
 function initFieldtone() {
   "use strict";
   const root = document.getElementById('fieldtone-container');
@@ -567,14 +787,7 @@ function initFieldtone() {
         modulation: randomBetween(1.4, 4.8)
       };
     });
-    const order = shuffled(pads.map((pad) => pad.index));
-    const possibleLinks = [];
-    for (let from = 0; from < order.length; from += 1) {
-      for (let to = from + 1; to < order.length; to += 1) {
-        if (Math.random() < 0.38) possibleLinks.push([order[from], order[to]]);
-      }
-    }
-    const links = shuffled(possibleLinks).slice(0, Math.floor(randomBetween(4, 8)));
+    const links = []; // FM connections are always made by the player.
     state.history.splice(state.historyIndex + 1);
     state.history.push({ pads, links });
     showPatch(state.history.length - 1);
@@ -630,8 +843,6 @@ function initFieldtone() {
           <span class="wave-wrap" aria-hidden="true">
             <svg class="waveform" viewBox="0 0 240 52" preserveAspectRatio="none">
               <path class="wave-line" d="${waveShape(index, pad.midi % 5)}"></path>
-              <circle class="wave-dots" cx="5" cy="26" r="2"></circle>
-              <circle class="wave-dots" cx="235" cy="26" r="2"></circle>
             </svg>
           </span>
           <span class="pad-readout" aria-hidden="true">
@@ -651,45 +862,10 @@ function initFieldtone() {
     });
   }
 
-  function renderWires() {
-    const bounds = stage.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) return;
-    wires.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
-    const centerOf = (pad) => {
-      const rect = pad.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2 - bounds.left, y: rect.top + rect.height / 2 - bounds.top };
-    };
-    const edgeCenter = (pad, angle, towardX, towardY) => {
-      const center = centerOf(pad);
-      const radians = angle * Math.PI / 180;
-      const cos = Math.cos(radians);
-      const sin = Math.sin(radians);
-      const localX = towardX * cos + towardY * sin;
-      const localY = -towardX * sin + towardY * cos;
-      const horizontal = Math.abs(localX) / pad.offsetWidth >= Math.abs(localY) / pad.offsetHeight;
-      const x = horizontal ? Math.sign(localX || 1) * pad.offsetWidth / 2 : 0;
-      const y = horizontal ? 0 : Math.sign(localY || 1) * pad.offsetHeight / 2;
-      return { x: center.x + x * cos - y * sin, y: center.y + x * sin + y * cos };
-    };
-    wires.innerHTML = state.links.map(([from, to], index) => {
-      const sourcePad = padGrid.querySelector(`[data-pad="${from}"]`);
-      const targetPad = padGrid.querySelector(`[data-pad="${to}"]`);
-      const sourceCenter = centerOf(sourcePad);
-      const targetCenter = centerOf(targetPad);
-      const source = edgeCenter(sourcePad, state.pads[from].angle, targetCenter.x - sourceCenter.x, targetCenter.y - sourceCenter.y);
-      const target = edgeCenter(targetPad, state.pads[to].angle, sourceCenter.x - targetCenter.x, sourceCenter.y - targetCenter.y);
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      const length = Math.hypot(dx, dy) || 1;
-      const bend = (index % 2 ? 1 : -1) * Math.min(38, length * .08);
-      const perpendicularX = -dy / length * bend;
-      const perpendicularY = dx / length * bend;
-      const c1x = source.x + dx * .35 + perpendicularX;
-      const c1y = source.y + dy * .35 + perpendicularY;
-      const c2x = source.x + dx * .65 + perpendicularX;
-      const c2y = source.y + dy * .65 + perpendicularY;
-      return `<path class="wire" d="M ${source.x} ${source.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${target.x} ${target.y}"></path><circle class="wire-dot" cx="${source.x}" cy="${source.y}" r="2.3"></circle><circle class="wire-dot" cx="${target.x}" cy="${target.y}" r="2.3"></circle>`;
-    }).join("");
+  function renderWires() { patchEditor.render(); }
+  function editLinks(links) {
+    state.links.splice(0, state.links.length, ...links);
+    patchGraphs.get(state.patch)?.fm.sync(state.links);
   }
 
   function announce(message) {
@@ -735,6 +911,7 @@ function initFieldtone() {
   function disposeUnusedGraphs() {
     for (const [patch, graph] of patchGraphs) {
       if (patch === state.patch || graph.voices > 0) continue;
+      graph.fm.dispose();
       for (const node of graph.nodes) node.disconnect();
       patchGraphs.delete(patch);
     }
@@ -743,7 +920,7 @@ function initFieldtone() {
   function graphFor(patch) {
     if (patchGraphs.has(patch)) return patchGraphs.get(patch);
     const context = state.audio;
-    const graph = { voices: 0, buses: [], reverbs: [], nodes: [] };
+    const graph = { voices: 0, buses: [], reverbs: [], modulators: [], nodes: [], fm: null };
     graph.buses = patch.pads.map(() => {
       const bus = context.createGain();
       bus.gain.value = 0.78;
@@ -761,13 +938,16 @@ function initFieldtone() {
       graph.nodes.push(convolver, returnGain);
       return convolver;
     });
-    for (const [from, to] of patch.links) {
-      const route = context.createGain();
-      route.gain.value = 0.17;
-      graph.buses[from].connect(route);
-      route.connect(graph.buses[to]);
-      graph.nodes.push(route);
-    }
+    const shape = Float32Array.from({ length: 1024 }, (_, i) => Math.tanh(i / 1023 * 2 - 1));
+    graph.modulators = patch.pads.map(() => {
+      const source = context.createWaveShaper();
+      source.curve = shape;
+      source.oversample = '2x';
+      graph.nodes.push(source);
+      return source;
+    });
+    graph.fm = createFmRouter(context, graph.modulators, later);
+    graph.fm.sync(patch.links);
     patchGraphs.set(patch, graph);
     return graph;
   }
@@ -813,6 +993,7 @@ function initFieldtone() {
       envelope.gain.setValueCurveAtTime(curveSamples(0.0001, peakLevel, settings.attackCurve), now, attackDuration);
       envelope.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
       const voices = [];
+      let carriers;
 
       if (pad.name === "Additive") {
         [1, 2, 3, 4].forEach((partial, i) => voices.push(addOscillator(context, envelope, "sine", hz * partial, randomBetween(-5, 5), 0.42 / (i + 1))));
@@ -840,6 +1021,7 @@ function initFieldtone() {
         modDepth.connect(carrier.frequency);
         carrier.connect(envelope);
         voices.push(carrier, modulator);
+        carriers = [carrier];
       } else if (pad.name === "Ring Mod") {
         const carrier = context.createOscillator();
         const modulator = context.createOscillator();
@@ -853,6 +1035,7 @@ function initFieldtone() {
         carrier.connect(ring);
         ring.connect(envelope);
         voices.push(carrier, modulator);
+        carriers = [carrier];
       } else if (pad.name === "Supersaw") {
         [-2, -1, 0, 1, 2].forEach((voice) => voices.push(addOscillator(context, envelope, "sawtooth", hz, voice * pad.detune, 0.2)));
       } else {
@@ -899,6 +1082,7 @@ function initFieldtone() {
       mix.gain.value = transition ? 0 : 1;
       gestureFilter.connect(mix);
       mix.connect(panner);
+      mix.connect(graph.modulators[index]);
       panner.connect(dry);
       dry.connect(graph.buses[index]);
       panner.connect(delaySend);
@@ -929,6 +1113,7 @@ function initFieldtone() {
         if (cleaned) return;
         cleaned = true;
         activeVoices.delete(voice);
+        graph.fm.removeVoice(voice);
         graph.voices--;
         disposeUnusedGraphs();
         for (const node of [envelope, gestureFilter, mix, panner, dry, delaySend, delay, delayFeedback, delayReturn, reverbSend]) node.disconnect();
@@ -969,6 +1154,7 @@ function initFieldtone() {
       };
       graph.voices++;
       activeVoices.add(voice);
+      graph.fm.addVoice(voice, index, carriers ?? voices);
       for (const oscillator of voices) oscillator.start(now);
       gate.voice = voice;
       if (transition) {
@@ -1043,13 +1229,10 @@ function initFieldtone() {
     clearTimeout(state.noticeTimer);
     if (state.audio && state.audio.state !== 'closed') void state.audio.close();
   }, { once: true, signal });
+  const patchEditor = setupPatching(root, () => state, editLinks, announce, signal);
   makePatch();
 }
 initFieldtone();
-
-
-
-
 
 
 const help = document.getElementById('hero-modal');
@@ -1060,6 +1243,7 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault(); help.showModal();
   }
 });
+
 
 </script>
 </body>

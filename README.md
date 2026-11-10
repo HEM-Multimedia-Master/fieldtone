@@ -26,6 +26,14 @@ effects, stereo positions, and signal connections. **< / >** restore earlier
 or later sets; **SET n / total** shows the position. Controls are available on
 both touch devices and desktop.
 
+Generating or revisiting a set preserves notes that are already sounding,
+including their original routing, delay, reverb, and scheduled release.
+Held keys and touches still release their original voices when you let go.
+New notes use the newly selected set. Each sounding set keeps its own effect
+graph; it is reclaimed after its last voice and effects tail finish. The
+existing 24-voice limit still applies: a new voice steals the oldest one only
+when that limit is reached.
+
 History belongs to the open page session. Reloading starts over. Generating
 from an earlier set replaces its future entries. Each pad's filter settings
 stay with its set; the ADSR envelope and master volume are shared across sets.
@@ -107,7 +115,7 @@ output meter, or dynamic-pan switch. The automatic stereo sweep is enabled.
 Touch and mouse can edit master volume directly through the attack point.
 
 Held notes are released when the window loses focus, the page becomes hidden,
-help opens, or the sound set changes. Cancelled touches release immediately.
+or help opens. Changing sound sets does not stop them. Cancelled touches release immediately.
 Up to 24 voices can overlap; older voices are cleared at that limit. A master
 compressor limits peaks from layered voices and resonant filters.
 
@@ -152,7 +160,7 @@ rotation. Visible keyboard focus and reduced-motion styles are included.
 The inline module is organized into math helpers, the envelope editor, and
 `initFieldtone()`. It uses a **state → render → interaction** pattern:
 
-- `state.pads` and `state.links` describe the current sound set and routing.
+- `state.pads`, `state.links`, and `state.patch` describe the current sound set and routing.
 - `state.history` and `state.historyIndex` track session snapshots.
 - `makePatch()` generates a set; `showPatch()` restores and renders one.
 - `renderPads()` and `renderWires()` project the same patch data visually.
@@ -163,7 +171,9 @@ The inline module is organized into math helpers, the envelope editor, and
 - `beginGate()` / `endGate()` pair pointer or keyboard presses with releases.
 - Pointer capture keeps a gesture attached to its original pad across the window.
 - `ensureAudio()` lazily initializes Web Audio after a playing gesture.
-- `releaseAll()` handles focus changes, dialogs, and sound-set changes safely.
+- `graphFor()` retains separate bus/reverb/routing nodes for each sounding set.
+- `disposeUnusedGraphs()` frees retired routing only after its last voice and tail finish.
+- `releaseAll()` handles focus changes and dialogs safely; set changes preserve active voices.
 
 `envelopeSettings` holds four durations plus attack and release curve modes. Master volume controls the height of the graph, so the displayed envelope reflects the output level.
 The gate map tracks independently held inputs; `activeVoices` tracks voices
@@ -217,6 +227,7 @@ When changing the instrument, check:
 
 - Desktop, portrait phone, tablet, and short landscape layouts: six pads,
   full viewport width, a 15% bottom panel, and reachable envelope points.
+- Hold a key or touch while generating with R; overlap old/new voices, verify a 10-second release survives set changes, and release the original input after its pad disappears.
 - R and previous/next navigation, disabled history boundaries, and branching
   history when generating from an earlier set.
 - Independent horizontal durations up to 10 seconds for A/R, A vertical volume, all three A/R curves, and keyboard point editing

@@ -155,7 +155,7 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
   <button id="hero-modal-close" type="button" aria-label="Close help">×</button>
   <h1 id="help-title">FIELDTONE</h1>
   <p>Hold a pad or keys <b>1–6</b> to play. Release to fade out. Multiple fingers play independent voices.</p>
-  <h2>Sound sets</h2><p><b>R</b> generates a set. <b>← / Space</b> goes back; <b>→ / Shift+Space</b> goes forward. History lasts until reload; generating from an older set replaces its future.</p>
+  <h2>Sound sets</h2><p><b>R</b> generates a set. <b>← / Space</b> goes back; <b>→ / Shift+Space</b> goes forward. Existing voices and their effects keep sounding when you change sets. History lasts until reload; generating from an older set replaces its future.</p>
   <h2>Crossmix</h2><p>Keep a pad pressed, drag into another pad, and stay there for 180 ms to crossfade over one second. Keep dragging to transition again; release to end the sound.</p>
   <h2>Envelope</h2><p>Drag <b>A, D, S, R</b> horizontally to move time boundaries (minimum 0.005 seconds per stage). Durations are independent; A and R reach 10 seconds, D and S reach 5 seconds. S is a minimum sustain duration at 60% of peak; holding extends it.</p>
   <p>Drag <b>A vertically for volume</b>. Hold <b>Shift while dragging A vertically</b>, or drag <b>R vertically</b>, for curves: up = logarithmic, middle = linear, down = power. Tab to a point: ← / → adjusts time (Shift for larger steps); ↑ / ↓ on A changes volume (Shift changes its curve); ↑ / ↓ on R changes its curve. Home / End sets a stage to its minimum / maximum.</p>
@@ -359,7 +359,7 @@ function initFieldtone() {
     Pluck: "TRIANGLE"
   };
   const state = {
-    pads: [], links: [], audio: null, buses: [], reverbs: [], master: null,
+    pads: [], links: [], patch: null, audio: null, master: null,
     noticeTimer: 0,
     history: [], historyIndex: -1, masterLevel: 80,
     volumeRamp: { startValue: 80, targetValue: 80, startTime: 0, duration: 0 }
@@ -395,6 +395,8 @@ function initFieldtone() {
   const envelopeSettings = { attack: 0.05, decay: 0.2, sustain: 0.4, release: 0.3, attackCurve: 'linear', releaseCurve: 'linear' };
   const gates = new Map();
   const activeVoices = new Set();
+  const patchGraphs = new Map();
+  let impulse = null;
   const crosshair = root.querySelector('#filter-crosshair');
   const timers = new Set();
   function later(callback, milliseconds) {
@@ -406,7 +408,7 @@ function initFieldtone() {
 
   function beginGate(index, key, origin = null, transitionSource = null) {
     if (gates.has(key)) return;
-    const gate = { transitionSource, index, pad: state.pads[index], released: false, cancelled: false, voice: null, origin, dragged: false };
+    const gate = { patch: state.patch, button: padGrid.querySelector(`[data-pad="${index}"]`), transitionSource, index, pad: state.pads[index], released: false, cancelled: false, voice: null, origin, dragged: false };
     gates.set(key, gate);
     void play(index, gate);
     return gate;
@@ -449,43 +451,45 @@ function initFieldtone() {
     }, 180);
   }
 
+  // Capture on the stable grid: rerendering a set must not cancel held touches.
+  padGrid.addEventListener('pointermove', (event) => {
+    const gate = gates.get(`pointer:${event.pointerId}`);
+    if (!gate) return;
+    if (!gate.dragged && Math.hypot(event.clientX - gate.origin.x, event.clientY - gate.origin.y) < 3) return;
+    gate.dragged = true;
+    considerTransition(gate, `pointer:${event.pointerId}`, event);
+    const filter = filterFromPosition(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
+    Object.assign(gate.pad, filter);
+    for (const voice of activeVoices) {
+      if (voice.pad !== gate.pad) continue;
+      const now = state.audio.currentTime;
+      voice.filter.frequency.setTargetAtTime(Math.min(filter.cutoff, state.audio.sampleRate * 0.45), now, 0.015);
+      voice.filter.Q.setTargetAtTime(filter.resonance, now, 0.015);
+    }
+    gate.button.querySelector('.filter-readout').textContent = `F ${Math.round(filter.cutoff)}Hz · Q ${filter.resonance.toFixed(1)}`;
+    crosshair.hidden = false;
+    crosshair.classList.toggle('at-right', event.clientX > innerWidth - 160);
+    crosshair.classList.toggle('at-bottom', event.clientY > innerHeight - 50);
+    crosshair.style.left = `${clamp(event.clientX, 0, innerWidth)}px`;
+    crosshair.style.top = `${clamp(event.clientY, 0, innerHeight)}px`;
+    crosshair.querySelector('span').textContent = `F ${Math.round(filter.cutoff)}Hz / Q ${filter.resonance.toFixed(1)}`;
+  }, { signal });
+  const finish = (event) => {
+    endGate(`pointer:${event.pointerId}`, event.type !== 'pointerup');
+    if (padGrid.hasPointerCapture(event.pointerId)) padGrid.releasePointerCapture(event.pointerId);
+  };
+  padGrid.addEventListener('pointerup', finish, { signal });
+  padGrid.addEventListener('pointercancel', finish, { signal });
+  padGrid.addEventListener('lostpointercapture', finish, { signal });
+
   function bindPadGesture(button, index) {
     button.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
       button.focus({ preventScroll: true });
       const gate = beginGate(index, `pointer:${event.pointerId}`, { x: event.clientX, y: event.clientY });
-      if (gate) button.setPointerCapture(event.pointerId);
+      if (gate) padGrid.setPointerCapture(event.pointerId);
     }, { signal });
-    button.addEventListener('pointermove', (event) => {
-      const gate = gates.get(`pointer:${event.pointerId}`);
-      if (!gate) return;
-      if (!gate.dragged && Math.hypot(event.clientX - gate.origin.x, event.clientY - gate.origin.y) < 3) return;
-      gate.dragged = true;
-      considerTransition(gate, `pointer:${event.pointerId}`, event);
-      const filter = filterFromPosition(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
-      Object.assign(gate.pad, filter);
-      for (const voice of activeVoices) {
-        if (voice.pad !== gate.pad) continue;
-        const now = state.audio.currentTime;
-        voice.filter.frequency.setTargetAtTime(Math.min(filter.cutoff, state.audio.sampleRate * 0.45), now, 0.015);
-        voice.filter.Q.setTargetAtTime(filter.resonance, now, 0.015);
-      }
-      padGrid.querySelector(`[data-pad="${gate.index}"] .filter-readout`).textContent = `F ${Math.round(filter.cutoff)}Hz · Q ${filter.resonance.toFixed(1)}`;
-      crosshair.hidden = false;
-      crosshair.classList.toggle('at-right', event.clientX > innerWidth - 160);
-      crosshair.classList.toggle('at-bottom', event.clientY > innerHeight - 50);
-      crosshair.style.left = `${clamp(event.clientX, 0, innerWidth)}px`;
-      crosshair.style.top = `${clamp(event.clientY, 0, innerHeight)}px`;
-      crosshair.querySelector('span').textContent = `F ${Math.round(filter.cutoff)}Hz / Q ${filter.resonance.toFixed(1)}`;
-    }, { signal });
-    const finish = (event) => {
-      endGate(`pointer:${event.pointerId}`, event.type !== 'pointerup');
-      if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
-    };
-    button.addEventListener('pointerup', finish, { signal });
-    button.addEventListener('pointercancel', finish, { signal });
-    button.addEventListener('lostpointercapture', finish, { signal });
     // Screen-reader activation and Enter retain native button behaviour.
     button.addEventListener('click', (event) => {
       if (event.detail !== 0) return;
@@ -541,13 +545,18 @@ function initFieldtone() {
 
   function showPatch(index) {
     if (index < 0 || index >= state.history.length) return;
-    releaseAll();
+    for (const gate of gates.values()) {
+      if (gate.hoverTimer) { clearTimeout(gate.hoverTimer); timers.delete(gate.hoverTimer); }
+      gate.hoverIndex = undefined;
+    }
     state.historyIndex = index;
-    state.pads = state.history[index].pads;
+    // Existing voices own their patch and graph until their release/effects finish.
+    state.patch = state.history[index];
+    state.pads = state.patch.pads;
     state.links = state.history[index].links;
     renderPads();
     renderWires();
-    updateAudioRouting();
+    disposeUnusedGraphs();
     historyPosition.value = `SET ${index + 1} / ${state.history.length}`;
     historyBack.disabled = index === 0;
     historyForward.disabled = index === state.history.length - 1;
@@ -680,37 +689,50 @@ function initFieldtone() {
       limiter.release.value = 0.15;
       state.master.connect(limiter);
       limiter.connect(context.destination);
-      state.buses = state.pads.map(() => context.createGain());
-      state.buses.forEach((bus) => { bus.gain.value = 0.78; });
-      const impulse = createImpulse(context);
-      state.reverbs = state.pads.map((_, index) => {
-        const convolver = context.createConvolver();
-        const returnGain = context.createGain();
-        convolver.buffer = impulse;
-        returnGain.gain.value = 0.42;
-        convolver.connect(returnGain);
-        returnGain.connect(state.buses[index]);
-        return convolver;
-      });
-      updateAudioRouting();
+      impulse = createImpulse(context);
     }
     if (state.audio.state !== "running") await state.audio.resume();
     return state.audio;
   }
 
-  function updateAudioRouting() {
-    if (!state.audio) return;
+  function disposeUnusedGraphs() {
+    for (const [patch, graph] of patchGraphs) {
+      if (patch === state.patch || graph.voices > 0) continue;
+      for (const node of graph.nodes) node.disconnect();
+      patchGraphs.delete(patch);
+    }
+  }
+
+  function graphFor(patch) {
+    if (patchGraphs.has(patch)) return patchGraphs.get(patch);
     const context = state.audio;
-    state.buses.forEach((bus) => {
-      bus.disconnect();
+    const graph = { voices: 0, buses: [], reverbs: [], nodes: [] };
+    graph.buses = patch.pads.map(() => {
+      const bus = context.createGain();
+      bus.gain.value = 0.78;
       bus.connect(state.master);
+      graph.nodes.push(bus);
+      return bus;
     });
-    state.links.forEach(([from, to]) => {
+    graph.reverbs = patch.pads.map((_, index) => {
+      const convolver = context.createConvolver();
+      const returnGain = context.createGain();
+      convolver.buffer = impulse;
+      returnGain.gain.value = 0.42;
+      convolver.connect(returnGain);
+      returnGain.connect(graph.buses[index]);
+      graph.nodes.push(convolver, returnGain);
+      return convolver;
+    });
+    for (const [from, to] of patch.links) {
       const route = context.createGain();
       route.gain.value = 0.17;
-      state.buses[from].connect(route);
-      route.connect(state.buses[to]);
-    });
+      graph.buses[from].connect(route);
+      route.connect(graph.buses[to]);
+      graph.nodes.push(route);
+    }
+    patchGraphs.set(patch, graph);
+    return graph;
   }
 
   function addOscillator(context, destination, type, hz, detune = 0, gainValue = 1) {
@@ -729,12 +751,13 @@ function initFieldtone() {
     try {
       const pad = gate.pad;
       const context = await ensureAudio();
-      if (gate.cancelled || signal.aborted || state.pads[index] !== pad) return;
+      if (gate.cancelled || signal.aborted) return;
       if (activeVoices.size >= 24) {
         const oldest = activeVoices.values().next().value;
         oldest.release(true);
         oldest.cleanup();
       }
+      const graph = graphFor(gate.patch);
       const now = context.currentTime;
       const baseHz = frequency(pad.midi);
       const hz = baseHz * (2 ** (randomBetween(-0.06, 0.06) / 12));
@@ -840,17 +863,17 @@ function initFieldtone() {
       gestureFilter.connect(mix);
       mix.connect(panner);
       panner.connect(dry);
-      dry.connect(state.buses[index]);
+      dry.connect(graph.buses[index]);
       panner.connect(delaySend);
       delaySend.connect(delay);
       delay.connect(delayFeedback);
       delayFeedback.connect(delay);
       delay.connect(delayReturn);
-      delayReturn.connect(state.buses[index]);
+      delayReturn.connect(graph.buses[index]);
       panner.connect(reverbSend);
-      reverbSend.connect(state.reverbs[index]);
+      reverbSend.connect(graph.reverbs[index]);
 
-      const padButton = padGrid.querySelector(`[data-pad="${index}"]`);
+      const padButton = gate.button;
       padButton.classList.add('is-playing');
       let released = false;
       let cleaned = false;
@@ -869,6 +892,8 @@ function initFieldtone() {
         if (cleaned) return;
         cleaned = true;
         activeVoices.delete(voice);
+        graph.voices--;
+        disposeUnusedGraphs();
         for (const node of [envelope, gestureFilter, mix, panner, dry, delaySend, delay, delayFeedback, delayReturn, reverbSend]) node.disconnect();
         if (![...activeVoices].some((other) => other.button === padButton)) padButton.classList.remove('is-playing');
       };
@@ -905,6 +930,7 @@ function initFieldtone() {
           later(cleanup, (stop - time + 2.2) * 1000);
         },
       };
+      graph.voices++;
       activeVoices.add(voice);
       for (const oscillator of voices) oscillator.start(now);
       gate.voice = voice;
@@ -972,7 +998,6 @@ function initFieldtone() {
   window.addEventListener('pagehide', (event) => {
     releaseAll();
     if (event.persisted) return;
-    releaseAll();
     for (const voice of [...activeVoices]) voice.cleanup();
     controller.abort();
     for (const timer of timers) clearTimeout(timer);
@@ -984,6 +1009,7 @@ function initFieldtone() {
   makePatch();
 }
 initFieldtone();
+
 
 
 

@@ -15,8 +15,10 @@ and filter different pads simultaneously. Audio starts after the first playing
 gesture, as required by browser autoplay policies.
 
 The wireframe interface fills the viewport without outer borders or padding.
-Six pads occupy the upper 85%; the bottom 15% contains sound-set navigation
-and the ADSR editor. Narrow screens use two columns of three pads; wider
+The bottom bar contains three full-height square navigation buttons followed
+by the ADSR editor. It uses 15% of viewport height, capped at 20% of viewport
+width on narrow screens so the envelope remains usable. The counter sits inside
+the R button area without reducing button height. Narrow screens use two columns of three pads; wider
 screens use three columns of two.
 
 ### Sound sets
@@ -245,7 +247,7 @@ When changing the instrument, check:
 
 - Manual OUT → FM IN connections, reconnection of either endpoint, body-drop deletion, cancellation, keyboard edits, and refusal of duplicate/feedback cables. Confirm that R starts with no cables and history restores manual links.
 - Desktop, portrait phone, tablet, and short landscape layouts: six pads,
-  full viewport width, a 15% bottom panel, square R / < / > buttons, and reachable envelope points/patch terminals.
+  full viewport width, an adaptive bottom bar, square R / < / > buttons, and reachable envelope points/patch terminals.
 - Hold a key or touch while generating with R; overlap old/new voices, verify a 10-second release survives set changes, and release the original input after its pad disappears.
 - R and previous/next navigation, disabled history boundaries, and branching
   history when generating from an earlier set.

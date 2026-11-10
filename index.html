@@ -9,6 +9,7 @@
 <style>
 
   #fieldtone-container {
+    --bar-height: min(15dvh, 20vw);
     --bg: #08090a;
     --line: #343a39;
     --text: #b6bfba;
@@ -31,7 +32,7 @@
   #fieldtone-container *, #fieldtone-container *::before, #fieldtone-container *::after { box-sizing: border-box; }
   #fieldtone-container button { color: inherit; font: inherit; border-radius: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #fieldtone-container button:focus-visible { outline: 1px solid var(--lime); outline-offset: -3px; }
-  #fieldtone-container .app { display: grid; grid-template-rows: minmax(0, 1fr) 15%; width: 100%; height: 100%; margin: 0; padding: 0; }
+  #fieldtone-container .app { display: grid; grid-template-rows: minmax(0, 1fr) var(--bar-height); width: 100%; height: 100%; margin: 0; padding: 0; }
   #fieldtone-container .instrument-stage { position: relative; width: 100%; max-width: none; min-width: 0; height: 100%; min-height: 0; background: transparent; border: 0; margin: 0; padding: 0; isolation: isolate; }
   #fieldtone-container .patch-wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
   #fieldtone-container .wire { fill: none; stroke: var(--cyan); stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 5; }
@@ -57,12 +58,12 @@
   #fieldtone-container .pad-readout i { font-style: normal; }
   #fieldtone-container .pad-readout em { color: var(--pad-accent); font-style: normal; }
   #fieldtone-container .filter-readout { color: var(--cyan); }
-  #fieldtone-container .bottom-panel { display: grid; grid-template-columns: clamp(86px, 18vw, 180px) minmax(0, 1fr); min-height: 0; border-top: 1px solid var(--line); }
-  #fieldtone-container .set-controls { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: minmax(0, 1fr) 20px; min-height: 0; border-right: 1px solid var(--line); }
-  #fieldtone-container .set-controls button { width: min(100%, max(0px, calc(15dvh - 20px))); height: auto; aspect-ratio: 1; align-self: center; justify-self: center; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 1px solid var(--line); font-size: clamp(13px, 2vw, 22px); touch-action: manipulation; }
+  #fieldtone-container .bottom-panel { display: grid; grid-template-columns: calc((var(--bar-height) - 1px) * 3 + 1px) minmax(0, 1fr); min-height: 0; border-top: 1px solid var(--line); }
+  #fieldtone-container .set-controls { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); min-height: 0; border-right: 1px solid var(--line); }
+  #fieldtone-container .set-controls button { width: 100%; height: 100%; aspect-ratio: 1; align-self: stretch; justify-self: stretch; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 1px solid var(--line); font-size: clamp(13px, 2vw, 22px); touch-action: manipulation; }
   #fieldtone-container #reroll-button { border: 1px solid var(--lime); color: var(--lime); }
   #fieldtone-container .set-controls button:disabled { opacity: .25; cursor: default; }
-  #fieldtone-container #history-position { grid-column: 1 / -1; display: grid; place-items: center; font-size: clamp(8px, 1vw, 10px); letter-spacing: .08em; }
+  #fieldtone-container #history-position { position: absolute; bottom: 4px; left: 0; width: calc(100% / 3); display: grid; place-items: center; pointer-events: none; font-size: clamp(8px, 1vw, 10px); letter-spacing: .08em; }
   #fieldtone-container .dynamic-scale { position: absolute; left: 7px; bottom: 3px; display: flex; gap: 7px; pointer-events: none; color: #535856; font: italic 12px/1 "Times New Roman", Times, serif; }
   #fieldtone-container .dynamic-mark.current { color: #a0a6a2; }
   #fieldtone-container #envelope-editor { min-width: 0; min-height: 0; position: relative; margin: 0; padding: 0; }
@@ -86,7 +87,7 @@
   #fieldtone-container #notice.visible { opacity: 1; }
   #fieldtone-container .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   /* Keep the shared information tap target out of the set navigation. */
-  #fieldtone-container ~ #info-corner { bottom: 15dvh; }
+  #fieldtone-container ~ #info-corner { bottom: min(15dvh, 20vw); }
   @media (max-width: 650px) {
     #fieldtone-container .pad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
     #fieldtone-container .pad:nth-child(n) { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -95,14 +96,13 @@
     #fieldtone-container .pad-readout { font-size: 7px; }
   }
   @media (max-height: 450px) {
-    #fieldtone-container .set-controls { grid-template-rows: minmax(0, 1fr) 14px; }
     #fieldtone-container .point-label { font-size: 7px; }
     #fieldtone-container .stage-time, #fieldtone-container .curve-name { display: none; }
     #fieldtone-container .envelope-point[data-stage="release"] .point-label { top: 0; }
   }
   @media (prefers-reduced-motion: reduce) { #fieldtone-container * { transition: none !important; } }
 html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscroll-behavior: none; }
-#info-corner { position: fixed; left: 0; bottom: 15dvh; width: 44px; height: 44px; border: 0; background: transparent; color: #b6bfba; font: 24px monospace; cursor: pointer; z-index: 15; }
+#info-corner { position: fixed; left: 0; bottom: min(15dvh, 20vw); width: 44px; height: 44px; border: 0; background: transparent; color: #b6bfba; font: 24px monospace; cursor: pointer; z-index: 15; }
 #hero-modal { box-sizing: border-box; max-width: min(640px, 94vw); max-height: 90dvh; padding: 24px; border: 1px solid #343a39; background: #08090a; color: #b6bfba; font: 14px/1.6 monospace; }
 #hero-modal::backdrop { background: #000c; }
 #hero-modal h1, #hero-modal h2, #hero-modal a { color: #c8f169; }

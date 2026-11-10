@@ -1,11 +1,11 @@
 # FIELDTONE
 
 A fullscreen, generative browser instrument: six synthesizer pads, a draggable
-ADSR envelope, and independent touch filters. Built with HTML, CSS, JavaScript,
+ADSR envelope, manual FM cables, and independent touch filters. Built with HTML, CSS, JavaScript,
 and Web Audio in a single dependency-free `index.html`. No account, build step,
 external service, or microphone is required.
 
-**[Play FIELDTONE](https://hem-multimedia-master.github.io/fieldtone/)**
+**[Play FIELDTONE](https://hem-multimedia-master.github.io/fieldtone/)** · [Play in the zztt Hyperphones suite](https://zztt.org/fieldtone/)
 
 ## Playing
 
@@ -23,8 +23,9 @@ screens use three columns of two.
 
 The square, green-bordered **R** button generates a new set of voices, pitches,
 effects and stereo positions. FM cables are created only by the player, never randomly. **< / >** restore earlier
-or later sets; **SET n / total** shows the position. Controls are available on
-both touch devices and desktop.
+or later sets; **SET n / total** shows the position. **R, < and > always remain
+square**, including on mobile and tablet. Controls are available on both touch
+devices and desktop.
 
 Generating or revisiting a set preserves notes that are already sounding,
 including their original routing, delay, reverb, and scheduled release.

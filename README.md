@@ -80,18 +80,15 @@ Attack, decay, and minimum sustain are captured when a note starts. Release
 time and curve are read when the note is released, so you can adjust R while
 holding a sound.
 
-### Filter gesture
+### Pad-local filter gestures
 
-Hold a pad, then drag anywhere across the **entire window**, including outside
-the original pad:
+Hold a pad, then drag **inside its square**. Every pad maps its own full filter range:
 
 - **Vertical:** low-pass cutoff frequency, logarithmically mapped from **40 Hz
-  at the bottom** to **16 kHz at the top** (limited by the audio sample rate).
-- **Horizontal:** filter **Q**, from **0.2 at the left** to **18 at the right**.
+  at the bottom of the pad** to **16 kHz at its top** (limited by the audio sample rate).
+- **Horizontal:** filter **Q**, from **0.2 at the left edge of the pad** to **18 at its right edge**.
 
-Q controls the resonance around the cutoff frequency. The crosshair and pad
-readout display the values. Different fingers control their originating pads
-independently, and filter changes are smoothed to avoid abrupt jumps.
+Q controls the resonance around the cutoff frequency. Each touch has its own numbered, coloured cursor and filter readout. Second and third touches work independently, including on the same pad. Releasing one finger removes only that cursor. Each pointer edits its own voice filter; the pad readout shows the most recent edit. When leaving a pad, its mapping clamps at the edge. After the crossfade dwell, that cursor uses the destination pad’s local coordinates. Filter changes are smoothed to avoid abrupt jumps.
 
 ### Cheatsheet
 
@@ -104,7 +101,7 @@ independently, and filter changes are smoothed to avoid abrupt jumps.
 | Edit envelope times | Drag A/D/S/R horizontally |
 | Change attack / release curve | Shift+drag A vertically / drag R vertically |
 | Crossmix | Hold, drag into another pad, and stay inside for 180 ms |
-| Filter a sound | Hold a pad and drag across the window |
+| Filter a sound | Hold a pad and drag inside its square |
 | Change volume | Drag A vertically, or `↑` / `↓` in 20% steps with a 500 ms fade |
 | Open help | Bottom-left corner button or **`I`**, not L |
 | Close help | Close button or `Esc` |
@@ -167,7 +164,7 @@ The inline module is organized into math helpers, the envelope editor, and
 - `setupEnvelopeEditor()` handles boundary dragging and keyboard edits.
 - `moveEnvelopePoint()` enforces stage-duration and boundary constraints.
 - `curveValue()` and `curveSamples()` share interpolation between SVG and audio.
-- `filterFromPosition()` maps viewport coordinates to cutoff and Q.
+- `filterFromPad()` maps each pad’s local coordinates to cutoff and Q.
 - `beginGate()` / `endGate()` pair pointer or keyboard presses with releases.
 - Pointer capture keeps a gesture attached to its original pad across the window.
 - `ensureAudio()` lazily initializes Web Audio after a playing gesture.
@@ -207,9 +204,9 @@ These principles describe the current instrument and its remaining limitations:
 1. **Access:** HTTPS play link, no account, and no external runtime dependencies.
 2. **Ubiquity:** Responsive pads, set navigation, and ADSR editing work with
    touch or mouse. Keyboard controls are also available; A provides touch-accessible master volume.
-3. **Gesture:** Hold/release plays a voice; full-window dragging filters it;
+3. **Gesture:** Hold/release plays a voice; pad-local dragging filters it;
    envelope points edit timing, volume, and curves; held drags crossmix voices. Multiple touches are independent.
-4. **Feedback:** Active waveforms, filter readouts, a crosshair, the envelope
+4. **Feedback:** Active waveforms, filter readouts, independent numbered cursors, the envelope
    graph, set counter, and status notices expose changes and audio-start errors.
 5. **Control:** Audio requires a playing gesture. Release, cancellation,
    focus loss, and opening help end held notes. There is no microphone input
@@ -232,7 +229,7 @@ When changing the instrument, check:
   history when generating from an earlier set.
 - Independent horizontal durations up to 10 seconds for A/R, A vertical volume, all three A/R curves, and keyboard point editing
   without accidentally navigating sets or changing volume.
-- Real audio output, long holds, release tails, full-window filter dragging,
-  two simultaneous touches controlling different pads, and held crossmix transitions between pads.
+- Real audio output, long holds, release tails, pad-local filter dragging,
+  three simultaneous touches with independent cursors and filters, including two on one pad, and held crossmix transitions between pads.
 - Release on blur, help opening, and touch cancellation; help focus and Escape.
 - No browser errors or overlapping Web Audio automation errors.

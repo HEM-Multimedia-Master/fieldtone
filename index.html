@@ -68,13 +68,13 @@
   #fieldtone-container .point-mark { width: 7px; height: 7px; border: 1px solid var(--lime); background: var(--bg); }
   #fieldtone-container .point-label { display: grid; gap: 2px; text-align: center; position: absolute; top: 25px; white-space: nowrap; font-size: clamp(7px, .8vw, 10px); line-height: 1; color: var(--text); }
   #fieldtone-container .envelope-point[data-stage="release"] .point-label { top: -16px; }
-  #fieldtone-container #filter-crosshair { position: fixed; width: 28px; height: 28px; border: 1px solid var(--cyan); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
-  #fieldtone-container #filter-crosshair::before, #fieldtone-container #filter-crosshair::after { content: ''; position: absolute; background: var(--cyan); }
-  #fieldtone-container #filter-crosshair::before { width: 44px; height: 1px; left: -9px; top: 13px; }
-  #fieldtone-container #filter-crosshair::after { height: 44px; width: 1px; top: -9px; left: 13px; }
-  #fieldtone-container #filter-crosshair span { position: absolute; left: 22px; top: 20px; white-space: nowrap; color: var(--cyan); font: 9px var(--mono); }
-  #fieldtone-container #filter-crosshair.at-right span { left: auto; right: 22px; }
-  #fieldtone-container #filter-crosshair.at-bottom span { top: auto; bottom: 20px; }
+  #fieldtone-container #filter-cursors { pointer-events: none; }
+  #fieldtone-container .filter-cursor b { position: absolute; top: -14px; left: 4px; color: var(--cursor-color); font: 10px var(--mono); }
+  #fieldtone-container .filter-cursor { position: fixed; width: 28px; height: 28px; border: 1px solid var(--cursor-color); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
+  #fieldtone-container .filter-cursor::before, #fieldtone-container .filter-cursor::after { content: ''; position: absolute; background: var(--cursor-color); }
+  #fieldtone-container .filter-cursor::before { width: 44px; height: 1px; left: -9px; top: 13px; }
+  #fieldtone-container .filter-cursor::after { height: 44px; width: 1px; top: -9px; left: 13px; }
+  #fieldtone-container .filter-cursor span { position: absolute; left: 22px; top: 20px; white-space: nowrap; color: var(--cursor-color); font: 9px var(--mono); }
   #fieldtone-container #notice { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); max-width: 90%; margin: 0; color: var(--lime); background: var(--bg); font: 10px var(--mono); opacity: 0; pointer-events: none; z-index: 12; }
   #fieldtone-container #notice.visible { opacity: 1; }
   #fieldtone-container .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -108,7 +108,7 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
 <body>
 <div id="fieldtone-container">
   <div class="app">
-    <main class="instrument-stage" aria-label="Six synthesizer pads. Hold and drag: vertical frequency, horizontal Q.">
+    <main class="instrument-stage" aria-label="Six synthesizer pads. Hold and drag inside each pad: vertical frequency, horizontal Q. Multiple touches have independent filters.">
       <svg id="patch-wires" class="patch-wires" aria-hidden="true"></svg>
       <div id="pad-grid" class="pad-grid"></div>
     </main>
@@ -147,7 +147,7 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
       </section>
     </div>
   </div>
-  <div id="filter-crosshair" aria-hidden="true" hidden><span></span></div>
+  <div id="filter-cursors" aria-hidden="true"></div>
   <div id="notice" role="status" aria-live="polite"></div>
 </div>
 <button id="info-corner" type="button" aria-label="How to play (I)" aria-haspopup="dialog" title="How to play (I)">⌞</button>
@@ -159,7 +159,7 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
   <h2>Crossmix</h2><p>Keep a pad pressed, drag into another pad, and stay there for 180 ms to crossfade over one second. Keep dragging to transition again; release to end the sound.</p>
   <h2>Envelope</h2><p>Drag <b>A, D, S, R</b> horizontally to move time boundaries (minimum 0.005 seconds per stage). Durations are independent; A and R reach 10 seconds, D and S reach 5 seconds. S is a minimum sustain duration at 60% of peak; holding extends it.</p>
   <p>Drag <b>A vertically for volume</b>. Hold <b>Shift while dragging A vertically</b>, or drag <b>R vertically</b>, for curves: up = logarithmic, middle = linear, down = power. Tab to a point: ← / → adjusts time (Shift for larger steps); ↑ / ↓ on A changes volume (Shift changes its curve); ↑ / ↓ on R changes its curve. Home / End sets a stage to its minimum / maximum.</p>
-  <h2>Filter gesture</h2><p>Hold a pad and drag across the full window. <b>Vertical</b>: cutoff frequency, 40 Hz at the bottom to 16 kHz at the top. <b>Horizontal</b>: Q, 0.2 at the left to 18 at the right. Each pad keeps its settings in its sound set.</p>
+  <h2>Filter gesture</h2><p>Hold a pad and drag within its square. Each pad maps the full filter range locally. Each finger has an independent numbered, coloured cursor, including two or three fingers on the same pad. Crossfade transfers each cursor to the destination pad. <b>Vertical</b>: cutoff frequency, 40 Hz at the bottom of the pad to 16 kHz at its top. <b>Horizontal</b>: Q, 0.2 at the left edge of the pad to 18 at its right edge. Each pad keeps its settings in its sound set.</p>
   <p><b>↑ / ↓</b> changes volume in 20% steps with a 500 ms fade (default 80%). Envelope points use their own arrow controls when focused.</p>
   <p><b>I</b> opens this help; <b>Esc</b> closes it. Opening help or leaving the page releases held sounds.</p>
   <p><a href="https://github.com/HEM-Multimedia-Master/fieldtone">Source and README</a></p>
@@ -203,7 +203,12 @@ function filterFromPosition(x, y, width, height) {
   return { cutoff: 40 * (400 ** vertical), resonance: 0.2 + horizontal * 17.8 };
 }
 
+// Client coordinates relative to a pad, clamped to its local filter range.
+function filterFromPad(x, y, rect) {
+  return filterFromPosition(x - rect.left, y - rect.top, rect.width, rect.height);
+}
 
+// Pointer and keyboard ADSR editor.
 function setupEnvelopeEditor(root, envelope, signal, volume) {
   const plot = root.querySelector('#envelope-plot');
   const svg = root.querySelector('#envelope-svg');
@@ -397,7 +402,7 @@ function initFieldtone() {
   const activeVoices = new Set();
   const patchGraphs = new Map();
   let impulse = null;
-  const crosshair = root.querySelector('#filter-crosshair');
+  const cursorLayer = root.querySelector('#filter-cursors');
   const timers = new Set();
   function later(callback, milliseconds) {
     const id = window.setTimeout(() => { timers.delete(id); callback(); }, milliseconds);
@@ -409,7 +414,10 @@ function initFieldtone() {
   function beginGate(index, key, origin = null, transitionSource = null) {
     if (gates.has(key)) return;
     const gate = { patch: state.patch, button: padGrid.querySelector(`[data-pad="${index}"]`), transitionSource, index, pad: state.pads[index], released: false, cancelled: false, voice: null, origin, dragged: false };
+    gate.input = transitionSource?.input ?? (origin ? createInput(origin) : null);
+    gate.filter = { cutoff: gate.pad.cutoff, resonance: gate.pad.resonance };
     gates.set(key, gate);
+    if (gate.input) updateGesture(gate, gate.input.position);
     void play(index, gate);
     return gate;
   }
@@ -420,13 +428,57 @@ function initFieldtone() {
     if (immediate) gate.cancelled = true;
     gate.voice?.release(immediate);
     gates.delete(key);
-    if (![...gates.values()].some((item) => item.dragged)) crosshair.hidden = true;
+    gate.input?.cursor.remove();
   }
   function releaseAll() {
     for (const gate of gates.values()) { gate.cancelled = true; gate.released = true; }
     gates.clear();
     for (const voice of activeVoices) voice.release(true);
-    crosshair.hidden = true;
+    cursorLayer.replaceChildren();
+  }
+  function createInput(position) {
+    const used = new Set([...cursorLayer.children].map((cursor) => Number(cursor.dataset.touch)));
+    let number = 1;
+    while (used.has(number)) number++;
+    const colors = ['#78d9d0', '#dfa0f4', '#c8f169', '#ffad77', '#83aaff', '#f0788e'];
+    const cursor = document.createElement('div');
+    cursor.className = 'filter-cursor';
+    cursor.dataset.touch = String(number);
+    cursor.style.setProperty('--cursor-color', colors[(number - 1) % colors.length]);
+    cursor.innerHTML = '<b></b><span></span>';
+    cursor.querySelector('b').textContent = String(number);
+    cursorLayer.append(cursor);
+    return { position, cursor, bounds: null };
+  }
+  function updateGesture(gate, position) {
+    const input = gate.input;
+    input.position = position;
+    if (gate.button.isConnected) input.bounds = gate.button.getBoundingClientRect();
+    const rect = input.bounds;
+    if (!rect || !rect.width || !rect.height) return;
+    gate.filter = filterFromPad(position.x, position.y, rect);
+    Object.assign(gate.pad, gate.filter);
+    // Each pointer controls its own voice, including multiple fingers on one pad.
+    if (gate.voice) {
+      const now = state.audio.currentTime;
+      gate.voice.filter.frequency.setTargetAtTime(Math.min(gate.filter.cutoff, state.audio.sampleRate * 0.45), now, 0.015);
+      gate.voice.filter.Q.setTargetAtTime(gate.filter.resonance, now, 0.015);
+    }
+    const label = `F ${Math.round(gate.filter.cutoff)}Hz · Q ${gate.filter.resonance.toFixed(1)}`;
+    gate.button.querySelector('.filter-readout').textContent = label;
+    const x = clamp(position.x, rect.left, rect.right);
+    const y = clamp(position.y, rect.top, rect.bottom);
+    input.cursor.dataset.pad = String(gate.index);
+    input.cursor.style.left = `${x}px`;
+    input.cursor.style.top = `${y}px`;
+    const number = input.cursor.querySelector('b');
+    number.style.left = `${clamp(x - 8, rect.left + 4, rect.right - 12) - x + 14}px`;
+    number.style.top = `${clamp(y - 28, rect.top + 4, rect.bottom - 12) - y + 14}px`;
+    const readout = input.cursor.querySelector('span');
+    readout.textContent = label;
+    const size = readout.getBoundingClientRect();
+    readout.style.left = `${clamp(x + 22, rect.left + 4, Math.max(rect.left + 4, rect.right - size.width - 4)) - x + 14}px`;
+    readout.style.top = `${clamp(y + 20, rect.top + 4, Math.max(rect.top + 4, rect.bottom - size.height - 4)) - y + 14}px`;
   }
   function padAt(x, y) {
     const button = document.elementFromPoint(x, y)?.closest('.pad');
@@ -442,12 +494,11 @@ function initFieldtone() {
     // Briefly dwelling avoids changing sounds when crossing a pad on the way elsewhere.
     gate.hoverTimer = later(() => {
       if (gates.get(key) !== gate || gate.released || gate.hoverIndex !== index) return;
-      Object.assign(state.pads[index], filterFromPosition(gate.position.x, gate.position.y, innerWidth, innerHeight));
       gates.delete(key);
       const destination = beginGate(index, key, gate.origin, gate);
       destination.dragged = true;
       destination.hoverIndex = index;
-      padGrid.querySelector(`[data-pad="${index}"] .filter-readout`).textContent = `F ${Math.round(destination.pad.cutoff)}Hz · Q ${destination.pad.resonance.toFixed(1)}`;
+      updateGesture(destination, gate.position);
     }, 180);
   }
 
@@ -458,21 +509,7 @@ function initFieldtone() {
     if (!gate.dragged && Math.hypot(event.clientX - gate.origin.x, event.clientY - gate.origin.y) < 3) return;
     gate.dragged = true;
     considerTransition(gate, `pointer:${event.pointerId}`, event);
-    const filter = filterFromPosition(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
-    Object.assign(gate.pad, filter);
-    for (const voice of activeVoices) {
-      if (voice.pad !== gate.pad) continue;
-      const now = state.audio.currentTime;
-      voice.filter.frequency.setTargetAtTime(Math.min(filter.cutoff, state.audio.sampleRate * 0.45), now, 0.015);
-      voice.filter.Q.setTargetAtTime(filter.resonance, now, 0.015);
-    }
-    gate.button.querySelector('.filter-readout').textContent = `F ${Math.round(filter.cutoff)}Hz · Q ${filter.resonance.toFixed(1)}`;
-    crosshair.hidden = false;
-    crosshair.classList.toggle('at-right', event.clientX > innerWidth - 160);
-    crosshair.classList.toggle('at-bottom', event.clientY > innerHeight - 50);
-    crosshair.style.left = `${clamp(event.clientX, 0, innerWidth)}px`;
-    crosshair.style.top = `${clamp(event.clientY, 0, innerHeight)}px`;
-    crosshair.querySelector('span').textContent = `F ${Math.round(filter.cutoff)}Hz / Q ${filter.resonance.toFixed(1)}`;
+    updateGesture(gate, { x: event.clientX, y: event.clientY });
   }, { signal });
   const finish = (event) => {
     endGate(`pointer:${event.pointerId}`, event.type !== 'pointerup');
@@ -853,8 +890,8 @@ function initFieldtone() {
       reverbSend.gain.value = pad.reverbMix * 0.58;
       const gestureFilter = context.createBiquadFilter();
       gestureFilter.type = 'lowpass';
-      gestureFilter.frequency.value = Math.min(pad.cutoff, context.sampleRate * 0.45);
-      gestureFilter.Q.value = pad.resonance;
+      gestureFilter.frequency.value = Math.min(gate.filter.cutoff, context.sampleRate * 0.45);
+      gestureFilter.Q.value = gate.filter.resonance;
       envelope.connect(gestureFilter);
       const mix = context.createGain();
       const transition = gate.transitionSource;
@@ -1009,6 +1046,8 @@ function initFieldtone() {
   makePatch();
 }
 initFieldtone();
+
+
 
 
 

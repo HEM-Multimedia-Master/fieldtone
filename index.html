@@ -109,6 +109,35 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
 #hero-modal h1 { font-size: 22px; } #hero-modal h2 { font-size: 16px; }
 #hero-modal-close { float: right; width: 44px; height: 44px; border: 1px solid #343a39; background: transparent; color: inherit; font-size: 24px; cursor: pointer; }
 :focus-visible { outline: 1px solid #c8f169; outline-offset: -3px; }
+
+  #hero-fullscreen-trigger {
+    display: none;
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    right: calc(env(safe-area-inset-right, 0px) + var(--share-offset, 44px));
+    z-index: 31000;
+    width: 44px;
+    height: 44px;
+    box-sizing: border-box;
+    padding: 4px;
+    align-items: flex-start;
+    justify-content: flex-end;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: white;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #hero-fullscreen-trigger:focus-visible { outline: 1px solid #c8f169; outline-offset: -3px; }
+  #hero-fullscreen-trigger .fullscreen-exit { display: none; }
+  #hero-fullscreen-trigger[data-active="true"] .fullscreen-enter { display: none; }
+  #hero-fullscreen-trigger[data-active="true"] .fullscreen-exit { display: block; }
+  #hero-fullscreen-status { position: fixed; top: 24px; right: 4px; z-index: 31001; max-width: min(260px, 90vw); padding: 6px; background: #08090a; color: white; font: 11px/1.4 monospace; }
+  @media (max-width: 1024px), (any-pointer: coarse) {
+    #hero-fullscreen-trigger:not([hidden]) { display: flex; }
+  }
+
 </style>
 </head>
 <body>
@@ -145,11 +174,19 @@ html, body { margin: 0; width: 100%; height: 100%; background: #08090a; overscro
   <div id="filter-cursors" aria-hidden="true"></div>
   <div id="notice" role="status" aria-live="polite"></div>
 </div>
+<button id="hero-fullscreen-trigger" type="button" aria-label="Enter full screen" title="Enter full screen" aria-pressed="false" hidden>
+  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <path class="fullscreen-enter" d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" />
+    <path class="fullscreen-exit" d="M3 8h5V3M21 8h-5V3M8 21v-5H3M16 21v-5h5" />
+  </svg>
+</button>
+<span id="hero-fullscreen-status" role="status" aria-live="polite" hidden></span>
 <button id="info-corner" type="button" aria-label="How to play (I)" aria-haspopup="dialog" title="How to play (I)">⌞</button>
 <dialog id="hero-modal" aria-labelledby="help-title">
   <button id="hero-modal-close" type="button" aria-label="Close help">×</button>
   <h1 id="help-title">FIELDTONE</h1>
   <p>Hold a pad or keys <b>1–6</b> to play. Release to fade out. Multiple fingers play independent voices.</p>
+  <h2>Full screen</h2><p>On supported tablet/mobile browsers, the icon in the upper-right enters or exits full screen. Help remains available.</p>
   <h2>Sound sets</h2><p><b>R</b> generates a set. <b>← / Space</b> goes back; <b>→ / Shift+Space</b> goes forward. Existing voices and their effects keep sounding when you change sets. History lasts until reload; generating from an older set replaces its future.</p>
   <h2>Crossmix</h2><p>Keep a pad pressed, drag into another pad, and stay there for 180 ms to crossfade over one second. Keep dragging to transition again; release to end the sound.</p>
   <h2>Manual FM cables</h2><p>New sets have no cables. Drag a free <b>OUT</b> circle to a free <b>FM IN</b> circle, then hold both sounds: the source modulates the destination's carrier frequency at a gentle depth. Connected endpoints can be dragged to another terminal of the same type. Drop on a pad body to delete; drop outside or cancel to keep the cable. Duplicate and feedback connections are rejected.</p><p>Keyboard: focus a terminal, Enter, focus its compatible terminal, Enter. Delete / Backspace removes a cable; Esc cancels. Connections stay with their set. The FM synth also retains its own internal modulation.</p>
@@ -1245,6 +1282,62 @@ document.addEventListener('keydown', (event) => {
 });
 
 
+
+function setupFullscreen(button, status) {
+  if (!button || button.dataset.ready) return () => {};
+  button.dataset.ready = 'true';
+  const root = document.documentElement;
+  const request = root.requestFullscreen ?? root.webkitRequestFullscreen;
+  const exit = document.exitFullscreen ?? document.webkitExitFullscreen;
+  const enabled = document.fullscreenEnabled ?? document.webkitFullscreenEnabled ?? true;
+  if (typeof request !== 'function' || typeof exit !== 'function' || !enabled) return () => {};
+  const controller = new AbortController();
+  const { signal } = controller;
+  let timer;
+  let pending = false;
+  const active = () => Boolean(document.fullscreenElement ?? document.webkitFullscreenElement);
+  function sync() {
+    const fullscreen = active();
+    button.setAttribute('aria-pressed', String(fullscreen));
+    button.setAttribute('aria-label', fullscreen ? 'Exit full screen' : 'Enter full screen');
+    button.title = fullscreen ? 'Exit full screen' : 'Enter full screen';
+    button.dataset.active = String(fullscreen);
+  }
+  function report() {
+    if (!status) return;
+    clearTimeout(timer);
+    status.hidden = false;
+    status.textContent = 'Full screen could not start. Try again or use your browser’s full-screen option.';
+    timer = setTimeout(() => { status.hidden = true; }, 4000);
+  }
+  button.style.setProperty('--share-offset', document.getElementById('hero-share-trigger') ? '44px' : '0px');
+  button.hidden = false;
+  sync();
+  button.addEventListener('click', async () => {
+    if (pending) return;
+    pending = true;
+    button.disabled = true;
+    if (status) status.hidden = true;
+    try {
+      if (active()) await exit.call(document);
+      else if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+      else await request.call(root);
+    } catch { report(); }
+    finally { pending = false; button.disabled = false; sync(); }
+  }, { signal });
+  for (const type of ['pointerdown', 'mousedown', 'touchstart', 'click']) {
+    button.addEventListener(type, (event) => event.stopPropagation(), { signal });
+  }
+  button.addEventListener('keydown', (event) => {
+    if (event.key === ' ' || event.key === 'Enter') event.stopPropagation();
+  }, { signal });
+  for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, sync, { signal });
+  for (const type of ['fullscreenerror', 'webkitfullscreenerror']) document.addEventListener(type, report, { signal });
+  return () => { controller.abort(); clearTimeout(timer); };
+}
+
+const cleanupFullscreen = setupFullscreen(document.getElementById('hero-fullscreen-trigger'), document.getElementById('hero-fullscreen-status'));
+window.addEventListener('pagehide', (event) => { if (!event.persisted) cleanupFullscreen(); });
 </script>
 </body>
 </html>

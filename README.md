@@ -21,6 +21,14 @@ width on narrow screens so the envelope remains usable. The counter sits inside
 the R button area without reducing button height. Narrow screens use two columns of three pads; wider
 screens use three columns of two.
 
+### Full screen
+
+On supported tablet/mobile browsers, the upper-right full-screen icon toggles
+browser full screen and updates its icon when you exit. In the zztt suite it
+sits immediately left of QR sharing; the standalone page places it in the
+upper-right corner. Help and sharing remain available because full screen
+targets the whole document. Unsupported browsers hide the control.
+
 ### Sound sets
 
 The square, green-bordered **R** button generates a new set of voices, pitches,
